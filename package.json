@@ -1,5 +1,5 @@
 {
-  "name": "grassroot-vetting-mcp",
+  "name": "nonprofit-vetting-mcp",
   "version": "1.0.0",
   "description": "MCP server for automated grassroots nonprofit vetting using ProPublica Nonprofit Explorer API",
   "type": "module",
@@ -7,11 +7,11 @@
   "types": "dist/index.d.ts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kofort9/grassroot-vetting-mcp.git"
+    "url": "https://github.com/kofort9/nonprofit-vetting-mcp.git"
   },
-  "homepage": "https://github.com/kofort9/grassroot-vetting-mcp#readme",
+  "homepage": "https://github.com/kofort9/nonprofit-vetting-mcp#readme",
   "bugs": {
-    "url": "https://github.com/kofort9/grassroot-vetting-mcp/issues"
+    "url": "https://github.com/kofort9/nonprofit-vetting-mcp/issues"
   },
   "scripts": {
     "build": "tsc",
