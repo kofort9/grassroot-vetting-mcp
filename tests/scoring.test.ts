@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  check501c3Status,
   checkYearsOperating,
   checkRevenueRange,
   checkOverheadRatio,
@@ -13,39 +12,19 @@ import {
 } from '../src/domain/nonprofit/scoring.js';
 import { resolveThresholds, getSupportedSectors } from '../src/domain/nonprofit/sector-thresholds.js';
 import { validateThresholds } from '../src/core/config.js';
-import { DEFAULT_THRESHOLDS, makeProfile, make990, makeFiling, taxPrdOffset } from './fixtures.js';
+import {
+  DEFAULT_THRESHOLDS,
+  makeProfile,
+  make990,
+  makeFiling,
+  taxPrdOffset,
+  makeMockIrsClient,
+  makeMockOfacClient,
+  makeRevokedIrsResult,
+  makeFlaggedCourtResult,
+} from './fixtures.js';
 
 const t = DEFAULT_THRESHOLDS;
-
-// ============================================================================
-// check501c3Status
-// ============================================================================
-
-describe('check501c3Status', () => {
-  it('passes for subsection 03', () => {
-    const result = check501c3Status(makeProfile({ subsection: '03' }), t);
-    expect(result.result).toBe('PASS');
-    expect(result.passed).toBe(true);
-    expect(result.weight).toBe(30);
-  });
-
-  it('fails for subsection 04', () => {
-    const result = check501c3Status(makeProfile({ subsection: '04' }), t);
-    expect(result.result).toBe('FAIL');
-    expect(result.passed).toBe(false);
-  });
-
-  it('fails for empty subsection', () => {
-    const result = check501c3Status(makeProfile({ subsection: '' }), t);
-    expect(result.result).toBe('FAIL');
-  });
-
-  it('fails for subsection 06 (501(c)(6) trade associations)', () => {
-    const result = check501c3Status(makeProfile({ subsection: '06' }), t);
-    expect(result.result).toBe('FAIL');
-    expect(result.detail).toContain('subsection 06');
-  });
-});
 
 // ============================================================================
 // checkYearsOperating
@@ -147,6 +126,13 @@ describe('checkOverheadRatio', () => {
     const result = checkOverheadRatio(makeProfile({ latest_990: null }), t);
     expect(result.result).toBe('REVIEW');
   });
+
+  it('fails for negative ratio with data anomaly message', () => {
+    const result = checkOverheadRatio(makeProfile({ latest_990: make990({ overhead_ratio: -0.5 }) }), t);
+    expect(result.result).toBe('FAIL');
+    expect(result.detail).toContain('Negative');
+    expect(result.detail).toContain('data anomaly');
+  });
 });
 
 // ============================================================================
@@ -243,15 +229,15 @@ describe('calculateScore', () => {
 // ============================================================================
 
 describe('getRecommendation', () => {
-  it('returns PASS for score >= 80 with no flags', () => {
+  it('returns PASS for score >= 75 with no flags', () => {
     expect(getRecommendation(85, [], t)).toBe('PASS');
   });
 
-  it('returns PASS at exactly 80 (boundary)', () => {
-    expect(getRecommendation(80, [], t)).toBe('PASS');
+  it('returns PASS at exactly 75 (boundary)', () => {
+    expect(getRecommendation(75, [], t)).toBe('PASS');
   });
 
-  it('returns REVIEW for score 50-79', () => {
+  it('returns REVIEW for score 50-74', () => {
     expect(getRecommendation(65, [], t)).toBe('REVIEW');
   });
 
@@ -264,7 +250,7 @@ describe('getRecommendation', () => {
   });
 
   it('returns REJECT when HIGH severity flag exists regardless of score', () => {
-    const highFlag = { severity: 'HIGH' as const, type: 'no_990_on_file' as const, detail: 'test' };
+    const highFlag = { severity: 'HIGH' as const, type: 'stale_990' as const, detail: 'test' };
     expect(getRecommendation(95, [highFlag], t)).toBe('REJECT');
   });
 
@@ -283,30 +269,6 @@ describe('detectRedFlags', () => {
     const profile = makeProfile();
     const flags = detectRedFlags(profile, [makeFiling()], t);
     expect(flags).toEqual([]);
-  });
-
-  it('flags no 990 on file (HIGH)', () => {
-    const profile = makeProfile({ filing_count: 0, latest_990: null });
-    const flags = detectRedFlags(profile, [], t);
-    expect(flags).toContainEqual(
-      expect.objectContaining({ type: 'no_990_on_file', severity: 'HIGH' })
-    );
-  });
-
-  it('flags non-501(c)(3) status (HIGH)', () => {
-    const profile = makeProfile({ subsection: '04' });
-    const flags = detectRedFlags(profile, [makeFiling()], t);
-    expect(flags).toContainEqual(
-      expect.objectContaining({ type: 'not_501c3', severity: 'HIGH' })
-    );
-  });
-
-  it('flags missing ruling date (HIGH)', () => {
-    const profile = makeProfile({ ruling_date: '', years_operating: null });
-    const flags = detectRedFlags(profile, [makeFiling()], t);
-    expect(flags).toContainEqual(
-      expect.objectContaining({ type: 'no_ruling_date', severity: 'HIGH' })
-    );
   });
 
   it('flags organization less than 1 year old (MEDIUM)', () => {
@@ -409,20 +371,21 @@ describe('detectRedFlags', () => {
 
   // --- Revenue decline ---
 
-  it('flags >50% revenue decline year-over-year (MEDIUM)', () => {
+  it('flags >20% revenue decline year-over-year (MEDIUM)', () => {
     const filings = [
-      makeFiling({ tax_prd: taxPrdOffset(0), totrevenue: 200_000 }),
+      makeFiling({ tax_prd: taxPrdOffset(0), totrevenue: 350_000 }),
       makeFiling({ tax_prd: taxPrdOffset(1), totrevenue: 500_000 }),
     ];
+    // 30% decline > 20% threshold
     const flags = detectRedFlags(makeProfile(), filings, t);
     expect(flags).toContainEqual(
       expect.objectContaining({ type: 'revenue_decline', severity: 'MEDIUM' })
     );
   });
 
-  it('does not flag 40% decline (below threshold)', () => {
+  it('does not flag 15% decline (below threshold)', () => {
     const filings = [
-      makeFiling({ tax_prd: taxPrdOffset(0), totrevenue: 300_000 }),
+      makeFiling({ tax_prd: taxPrdOffset(0), totrevenue: 425_000 }),
       makeFiling({ tax_prd: taxPrdOffset(1), totrevenue: 500_000 }),
     ];
     const flags = detectRedFlags(makeProfile(), filings, t);
@@ -455,6 +418,18 @@ describe('detectRedFlags', () => {
       makeFiling({ tax_prd: taxPrdOffset(1), totrevenue: 0 }),
     ];
     // Should not throw, and should not flag decline (can't calculate % from 0)
+    const flags = detectRedFlags(makeProfile(), filings, t);
+    expect(flags).not.toContainEqual(
+      expect.objectContaining({ type: 'revenue_decline' })
+    );
+  });
+
+  it('skips revenue decline check when filings are >18 months apart', () => {
+    const filings = [
+      makeFiling({ tax_prd: taxPrdOffset(0), totrevenue: 200_000 }),
+      makeFiling({ tax_prd: taxPrdOffset(3), totrevenue: 500_000 }), // 3 years ago
+    ];
+    // 60% decline, but filings are ~36 months apart — skip
     const flags = detectRedFlags(makeProfile(), filings, t);
     expect(flags).not.toContainEqual(
       expect.objectContaining({ type: 'revenue_decline' })
@@ -548,86 +523,122 @@ describe('detectRedFlags', () => {
 describe('runTier1Checks', () => {
   it('returns PASS for a clean healthy profile', () => {
     const profile = makeProfile();
-    const result = runTier1Checks(profile, [makeFiling()], t);
+    const irsClient = makeMockIrsClient();
+    const ofacClient = makeMockOfacClient();
+    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any);
 
     expect(result.recommendation).toBe('PASS');
     expect(result.passed).toBe(true);
     expect(result.score).toBe(100);
+    expect(result.gate_blocked).toBe(false);
+    expect(result.gates.all_passed).toBe(true);
     expect(result.red_flags).toHaveLength(0);
-    expect(result.checks).toHaveLength(5);
+    expect(result.checks).toHaveLength(4);
     expect(result.summary.headline).toBe('Approved for Tier 2 Vetting');
   });
 
-  it('returns REJECT for non-501(c)(3) (HIGH flag overrides score)', () => {
-    const profile = makeProfile({ subsection: '04' });
-    const result = runTier1Checks(profile, [makeFiling()], t);
+  it('returns REJECT when IRS revocation gate fails', () => {
+    const profile = makeProfile();
+    const irsClient = makeMockIrsClient();
+    irsClient.check.mockReturnValue(makeRevokedIrsResult());
+    const ofacClient = makeMockOfacClient();
+    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any);
 
     expect(result.recommendation).toBe('REJECT');
     expect(result.passed).toBe(false);
-    // Score might still be decent (70 = all pass except 501c3) but HIGH flag forces REJECT
-    expect(result.red_flags.some(f => f.type === 'not_501c3')).toBe(true);
+    expect(result.gate_blocked).toBe(true);
+    expect(result.score).toBeNull();
+    expect(result.checks).toBeNull();
   });
 
-  it('returns REJECT for bare minimum profile (no data)', () => {
+  it('returns REJECT for non-501(c)(3) (gate failure)', () => {
+    const profile = makeProfile({ subsection: '04' });
+    const irsClient = makeMockIrsClient();
+    const ofacClient = makeMockOfacClient();
+    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any);
+
+    expect(result.recommendation).toBe('REJECT');
+    expect(result.gate_blocked).toBe(true);
+    expect(result.score).toBeNull();
+  });
+
+  it('returns REJECT for bare minimum profile (no filings = gate 3 fail)', () => {
     const profile = makeProfile({
-      subsection: '',
       years_operating: null,
       ruling_date: '',
       latest_990: null,
       filing_count: 0,
     });
-    const result = runTier1Checks(profile, [], t);
+    const irsClient = makeMockIrsClient();
+    const ofacClient = makeMockOfacClient();
+    const result = runTier1Checks(profile, [], t, irsClient as any, ofacClient as any);
 
     expect(result.recommendation).toBe('REJECT');
-    // Score is 10, not 0: checkOverheadRatio returns REVIEW for missing data (50% of weight 20 = 10)
-    expect(result.score).toBe(10);
-    expect(result.red_flags.length).toBeGreaterThan(0);
+    // Gate 1 passes (subsection 03 + not revoked + has ruling_date... wait, ruling_date is '')
+    // Actually Gate 1 sub-check C will fail (no ruling date)
+    expect(result.gate_blocked).toBe(true);
+    expect(result.score).toBeNull();
   });
 
   // --- review_reasons field ---
 
   it('has empty review_reasons for a clean PASS profile', () => {
-    const result = runTier1Checks(makeProfile(), [makeFiling()], t);
+    const irsClient = makeMockIrsClient();
+    const ofacClient = makeMockOfacClient();
+    const result = runTier1Checks(makeProfile(), [makeFiling()], t, irsClient as any, ofacClient as any);
     expect(result.review_reasons).toEqual([]);
   });
 
   it('includes REVIEW check details in review_reasons', () => {
     // Profile with 2 years operating -> REVIEW on years check
     const profile = makeProfile({ years_operating: 2 });
-    const result = runTier1Checks(profile, [makeFiling()], t);
+    const irsClient = makeMockIrsClient();
+    const ofacClient = makeMockOfacClient();
+    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any);
 
     expect(result.review_reasons.length).toBeGreaterThan(0);
     expect(result.review_reasons.some(r => r.includes('newer organization'))).toBe(true);
   });
 
-  it('includes FAIL check details in review_reasons', () => {
-    const profile = makeProfile({ subsection: '04' });
-    const result = runTier1Checks(profile, [makeFiling()], t);
+  it('includes FAIL check details in review_reasons (scoring FAIL, not gate)', () => {
+    // Revenue too low -> scoring FAIL, not a gate failure
+    const profile = makeProfile({ latest_990: make990({ total_revenue: 10_000 }) });
+    const irsClient = makeMockIrsClient();
+    const ofacClient = makeMockOfacClient();
+    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any);
 
-    expect(result.review_reasons.some(r => r.includes('Not a 501(c)(3)'))).toBe(true);
+    expect(result.review_reasons.some(r => r.includes('too small'))).toBe(true);
   });
 
   it('includes HIGH red flag details prefixed with RED FLAG:', () => {
-    const profile = makeProfile({ subsection: '04' });
-    const result = runTier1Checks(profile, [makeFiling()], t);
+    // Stale 990 triggers HIGH red flag
+    const profile = makeProfile({ latest_990: make990({ tax_period: '2018-06' }) });
+    const irsClient = makeMockIrsClient();
+    const ofacClient = makeMockOfacClient();
+    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any);
 
     expect(result.review_reasons.some(r => r.startsWith('RED FLAG:'))).toBe(true);
   });
 
-  it('collects all non-PASS reasons for bare minimum profile', () => {
-    const profile = makeProfile({
-      subsection: '',
-      years_operating: null,
-      ruling_date: '',
-      latest_990: null,
-      filing_count: 0,
-    });
-    const result = runTier1Checks(profile, [], t);
+  it('includes court records in red flags when provided', () => {
+    const profile = makeProfile();
+    const irsClient = makeMockIrsClient();
+    const ofacClient = makeMockOfacClient();
+    const courtResult = makeFlaggedCourtResult(3);
+    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any, courtResult);
 
-    // 4 FAIL checks + 1 REVIEW check (overhead) = 5 check reasons
-    // Plus HIGH red flags (no_990, not_501c3, no_ruling_date)
-    expect(result.review_reasons.length).toBeGreaterThanOrEqual(5);
-    expect(result.review_reasons.filter(r => r.startsWith('RED FLAG:')).length).toBeGreaterThan(0);
+    expect(result.red_flags).toContainEqual(
+      expect.objectContaining({ type: 'court_records', severity: 'HIGH' })
+    );
+  });
+
+  it('gate-blocked results have gate failure in review_reasons', () => {
+    const profile = makeProfile({ subsection: '04' });
+    const irsClient = makeMockIrsClient();
+    const ofacClient = makeMockOfacClient();
+    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any);
+
+    expect(result.review_reasons.some(r => r.includes('Gate failure'))).toBe(true);
   });
 });
 
@@ -647,8 +658,9 @@ describe('runRedFlagCheck', () => {
   });
 
   it('returns clean=false when flags exist', () => {
-    const profile = makeProfile({ subsection: '06', filing_count: 0, latest_990: null });
-    const result = runRedFlagCheck(profile, [], t);
+    // Use a stale 990 to trigger a red flag (gate-handled flags removed)
+    const profile = makeProfile({ latest_990: make990({ tax_period: '2018-06' }) });
+    const result = runRedFlagCheck(profile, [makeFiling()], t);
 
     expect(result.clean).toBe(false);
     expect(result.flags.length).toBeGreaterThan(0);
@@ -678,7 +690,7 @@ describe('resolveThresholds', () => {
     expect(resolved.redFlagHighExpenseRatio).toBe(1.5);
     expect(resolved.redFlagLowExpenseRatio).toBe(0.4);
     // Non-overridden fields stay at base
-    expect(resolved.weight501c3Status).toBe(t.weight501c3Status);
+    expect(resolved.weightYearsOperating).toBe(t.weightYearsOperating);
     expect(resolved.revenuePassMin).toBe(t.revenuePassMin);
   });
 
@@ -699,7 +711,7 @@ describe('resolveThresholds', () => {
     expect(resolved.redFlagHighCompensation).toBe(0.5);
     expect(resolved.redFlagModerateCompensation).toBe(0.35);
     // Non-overridden fields stay at base
-    expect(resolved.weight501c3Status).toBe(t.weight501c3Status);
+    expect(resolved.weightYearsOperating).toBe(t.weightYearsOperating);
   });
 
   it('is case-insensitive on NTEE code', () => {

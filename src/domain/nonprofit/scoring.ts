@@ -7,37 +7,19 @@ import {
   RedFlagResult,
   ProPublica990Filing,
   VettingThresholds,
+  CourtRecordsResult,
 } from "./types.js";
-import { generateSummary } from "./messages.js";
+import { generateSummary, generateGateFailureSummary } from "./messages.js";
+import type { IrsRevocationClient } from "../red-flags/irs-revocation-client.js";
+import type { OfacSdnClient } from "../red-flags/ofac-sdn-client.js";
+import { runPreScreenGates } from "../gates/gate-runner.js";
 
 // ============================================================================
-// Tier 1 Individual Check Functions
+// Tier 1 Individual Check Functions (4 checks, 501c3 moved to gate layer)
 // ============================================================================
 
 /**
- * Check 1: 501(c)(3) Status
- * PASS: subsection === "03"
- * FAIL: anything else
- */
-export function check501c3Status(
-  profile: NonprofitProfile,
-  t: VettingThresholds,
-): Tier1Check {
-  const passed = profile.subsection === "03";
-
-  return {
-    name: "501c3_status",
-    passed,
-    result: passed ? "PASS" : "FAIL",
-    detail: passed
-      ? `501(c)(3) public charity (subsection ${profile.subsection})`
-      : `Not a 501(c)(3) - subsection ${profile.subsection || "unknown"}`,
-    weight: t.weight501c3Status,
-  };
-}
-
-/**
- * Check 2: Years Operating
+ * Check 1: Years Operating
  * PASS: >= yearsPassMin
  * REVIEW: >= yearsReviewMin
  * FAIL: < yearsReviewMin or no ruling date
@@ -144,6 +126,9 @@ export function checkOverheadRatio(
   if (ratio === undefined || ratio === null || Number.isNaN(ratio)) {
     result = "REVIEW";
     detail = "Cannot calculate expense efficiency - missing data";
+  } else if (ratio < 0) {
+    result = "FAIL";
+    detail = `Negative expense-to-revenue ratio (${formatPercent(ratio)}) - data anomaly requires investigation`;
   } else if (ratio >= t.expenseRatioPassMin && ratio <= t.expenseRatioPassMax) {
     result = "PASS";
     detail = `${formatPercent(ratio)} expense-to-revenue ratio - healthy fund deployment`;
@@ -265,41 +250,19 @@ export function getRecommendation(
 // ============================================================================
 
 /**
- * Detect red flags from profile data
+ * Detect red flags from profile data.
+ *
+ * NOTE: 501c3 status, IRS revocation, OFAC sanctions, and 990 existence
+ * are now handled by the gate layer. This function only checks red flags
+ * that apply AFTER gates have passed.
  */
 export function detectRedFlags(
   profile: NonprofitProfile,
   filings: ProPublica990Filing[] | undefined,
   t: VettingThresholds,
+  courtResult?: CourtRecordsResult,
 ): RedFlag[] {
   const flags: RedFlag[] = [];
-
-  // No 990 on file
-  if (profile.filing_count === 0 || !profile.latest_990) {
-    flags.push({
-      severity: "HIGH",
-      type: "no_990_on_file",
-      detail: "No 990 filings on record with ProPublica",
-    });
-  }
-
-  // Not 501(c)(3)
-  if (profile.subsection !== "03") {
-    flags.push({
-      severity: "HIGH",
-      type: "not_501c3",
-      detail: `Organization is 501(c)(${profile.subsection || "?"}) - donations may not be tax-deductible`,
-    });
-  }
-
-  // No ruling date
-  if (!profile.ruling_date || profile.years_operating === null) {
-    flags.push({
-      severity: "HIGH",
-      type: "no_ruling_date",
-      detail: "No IRS ruling date on record",
-    });
-  }
 
   // Too new
   if (
@@ -374,13 +337,21 @@ export function detectRedFlags(
     }
   }
 
-  // Revenue decline check (requires multiple filings)
+  // Revenue decline check (requires multiple filings from consecutive periods)
   if (filings && filings.length >= 2) {
     const sorted = [...filings].sort((a, b) => b.tax_prd - a.tax_prd);
     const latest = sorted[0];
     const previous = sorted[1];
 
+    // Only compare filings within 18 months of each other (tax_prd is YYYYMM).
+    // Filings >18 months apart may reflect a gap, not a true decline.
+    const periodGapMonths =
+      (Math.floor(latest.tax_prd / 100) - Math.floor(previous.tax_prd / 100)) *
+        12 +
+      ((latest.tax_prd % 100) - (previous.tax_prd % 100));
+
     if (
+      periodGapMonths <= 18 &&
       latest.totrevenue != null &&
       previous.totrevenue != null &&
       previous.totrevenue > 0 &&
@@ -401,7 +372,47 @@ export function detectRedFlags(
     }
   }
 
+  // Court records (requires CourtListener API result)
+  if (courtResult && courtResult.found && courtResult.caseCount > 0) {
+    if (courtResult.caseCount >= 3) {
+      flags.push({
+        severity: "HIGH",
+        type: "court_records",
+        detail: `${courtResult.caseCount} federal court case(s) on record`,
+      });
+    } else {
+      flags.push({
+        severity: "MEDIUM",
+        type: "court_records",
+        detail: `${courtResult.caseCount} federal court case(s) on record`,
+      });
+    }
+  }
+
   return flags;
+}
+
+// ============================================================================
+// Scoring-Only Helper (used by runTier1Checks)
+// ============================================================================
+
+/**
+ * Run the 4 scoring checks and return checks + score.
+ * Separated from the orchestrator for testability.
+ */
+export function runScoringChecks(
+  profile: NonprofitProfile,
+  t: VettingThresholds,
+): { checks: Tier1Check[]; score: number } {
+  const checks: Tier1Check[] = [
+    checkYearsOperating(profile, t),
+    checkRevenueRange(profile, t),
+    checkOverheadRatio(profile, t),
+    checkRecent990(profile, t),
+  ];
+
+  const score = calculateScore(checks);
+  return { checks, score };
 }
 
 // ============================================================================
@@ -409,38 +420,60 @@ export function detectRedFlags(
 // ============================================================================
 
 /**
- * Run all Tier 1 checks and return comprehensive result
+ * Run full Tier 1 pipeline: gates → scoring → red flags.
+ *
+ * If gates block, returns REJECT with null score/checks.
  */
 export function runTier1Checks(
   profile: NonprofitProfile,
   filings: ProPublica990Filing[] | undefined,
   t: VettingThresholds,
+  irsClient: IrsRevocationClient,
+  ofacClient: OfacSdnClient,
+  courtResult?: CourtRecordsResult,
 ): Tier1Result {
-  // Run all individual checks
-  const checks: Tier1Check[] = [
-    check501c3Status(profile, t),
-    checkYearsOperating(profile, t),
-    checkRevenueRange(profile, t),
-    checkOverheadRatio(profile, t),
-    checkRecent990(profile, t),
-  ];
+  // Layer 1: Pre-screen gates
+  const gateResult = runPreScreenGates(profile, irsClient, ofacClient);
 
-  // Calculate score
-  const score = calculateScore(checks);
+  if (!gateResult.all_passed) {
+    // Gate-blocked: REJECT immediately, no scoring
+    const summary = generateGateFailureSummary(
+      profile.name,
+      gateResult.blocking_gate ?? "unknown",
+      gateResult.gates,
+    );
 
-  // Detect red flags
-  const redFlags = detectRedFlags(profile, filings, t);
+    return {
+      ein: profile.ein,
+      name: profile.name,
+      passed: false,
+      gates: gateResult,
+      gate_blocked: true,
+      score: null,
+      summary,
+      checks: null,
+      recommendation: "REJECT",
+      review_reasons: [
+        `Gate failure: ${gateResult.blocking_gate ?? "unknown gate"}`,
+      ],
+      red_flags: [],
+    };
+  }
+
+  // Layer 2: Scoring engine (4 checks x 25 pts)
+  const { checks, score } = runScoringChecks(profile, t);
+
+  // Layer 3: Red flag overlay
+  const redFlags = detectRedFlags(profile, filings, t, courtResult);
 
   // Determine recommendation
   const recommendation = getRecommendation(score, redFlags, t);
-
-  // Overall passed = recommendation is PASS
   const passed = recommendation === "PASS";
 
-  // Collect review reasons: details from non-PASS checks + HIGH red flags
+  // Collect review reasons
   const review_reasons = buildReviewReasons(checks, redFlags);
 
-  // Generate standardized summary
+  // Generate summary
   const summary = generateSummary(
     profile.name,
     score,
@@ -454,6 +487,8 @@ export function runTier1Checks(
     ein: profile.ein,
     name: profile.name,
     passed,
+    gates: gateResult,
+    gate_blocked: false,
     score,
     summary,
     checks,
@@ -470,8 +505,9 @@ export function runRedFlagCheck(
   profile: NonprofitProfile,
   filings: ProPublica990Filing[] | undefined,
   t: VettingThresholds,
+  courtResult?: CourtRecordsResult,
 ): RedFlagResult {
-  const flags = detectRedFlags(profile, filings, t);
+  const flags = detectRedFlags(profile, filings, t, courtResult);
 
   return {
     ein: profile.ein,

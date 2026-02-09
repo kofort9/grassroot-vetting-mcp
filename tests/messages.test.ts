@@ -13,11 +13,11 @@ import type { Tier1Check, RedFlag } from '../src/domain/nonprofit/types.js';
 
 function makeCheck(overrides?: Partial<Tier1Check>): Tier1Check {
   return {
-    name: '501c3_status',
+    name: 'years_operating',
     passed: true,
     result: 'PASS',
-    detail: '501(c)(3) status confirmed',
-    weight: 30,
+    detail: '15 years operating (since 2010-01-01)',
+    weight: 25,
     ...overrides,
   };
 }
@@ -25,8 +25,8 @@ function makeCheck(overrides?: Partial<Tier1Check>): Tier1Check {
 function makeRedFlag(overrides?: Partial<RedFlag>): RedFlag {
   return {
     severity: 'HIGH',
-    type: 'no_990_on_file',
-    detail: 'No 990 filings found',
+    type: 'stale_990',
+    detail: 'Most recent 990 is from 2018-06 (8.0 years old)',
     ...overrides,
   };
 }
@@ -59,14 +59,13 @@ describe('VERDICT_CONFIG', () => {
 
 describe('CHECK_MESSAGES', () => {
   const expectedChecks = [
-    '501c3_status',
     'years_operating',
     'revenue_range',
     'overhead_ratio',
     'recent_990',
   ];
 
-  it('has entries for all 5 checks', () => {
+  it('has entries for all 4 checks', () => {
     for (const check of expectedChecks) {
       expect(CHECK_MESSAGES[check]).toBeDefined();
     }
@@ -89,10 +88,10 @@ describe('CHECK_MESSAGES', () => {
 
 describe('RED_FLAG_FACTORS', () => {
   it('maps known red flag types to messages', () => {
-    expect(RED_FLAG_FACTORS['no_990_on_file']).toBeTypeOf('string');
     expect(RED_FLAG_FACTORS['stale_990']).toBeTypeOf('string');
     expect(RED_FLAG_FACTORS['very_low_revenue']).toBeTypeOf('string');
-    expect(RED_FLAG_FACTORS['not_501c3']).toBeTypeOf('string');
+    expect(RED_FLAG_FACTORS['court_records']).toBeTypeOf('string');
+    expect(RED_FLAG_FACTORS['high_officer_compensation']).toBeTypeOf('string');
   });
 });
 
@@ -102,7 +101,6 @@ describe('RED_FLAG_FACTORS', () => {
 
 describe('generateSummary', () => {
   const allPassChecks: Tier1Check[] = [
-    makeCheck({ name: '501c3_status', result: 'PASS' }),
     makeCheck({ name: 'years_operating', result: 'PASS' }),
     makeCheck({ name: 'revenue_range', result: 'PASS' }),
     makeCheck({ name: 'overhead_ratio', result: 'PASS' }),
@@ -145,7 +143,6 @@ describe('generateSummary', () => {
 
   describe('REVIEW recommendation', () => {
     const mixedChecks: Tier1Check[] = [
-      makeCheck({ name: '501c3_status', result: 'PASS' }),
       makeCheck({ name: 'years_operating', result: 'REVIEW', passed: false, detail: 'Only 2 years' }),
       makeCheck({ name: 'revenue_range', result: 'FAIL', passed: false, detail: 'Revenue too low' }),
       makeCheck({ name: 'overhead_ratio', result: 'PASS' }),
@@ -165,11 +162,10 @@ describe('generateSummary', () => {
 
     it('limits issues summary to 3 items', () => {
       const manyFailChecks = [
-        makeCheck({ name: '501c3_status', result: 'FAIL', detail: 'Issue 1' }),
-        makeCheck({ name: 'years_operating', result: 'FAIL', detail: 'Issue 2' }),
-        makeCheck({ name: 'revenue_range', result: 'FAIL', detail: 'Issue 3' }),
-        makeCheck({ name: 'overhead_ratio', result: 'FAIL', detail: 'Issue 4' }),
-        makeCheck({ name: 'recent_990', result: 'FAIL', detail: 'Issue 5' }),
+        makeCheck({ name: 'years_operating', result: 'FAIL', detail: 'Issue 1' }),
+        makeCheck({ name: 'revenue_range', result: 'FAIL', detail: 'Issue 2' }),
+        makeCheck({ name: 'overhead_ratio', result: 'FAIL', detail: 'Issue 3' }),
+        makeCheck({ name: 'recent_990', result: 'FAIL', detail: 'Issue 4' }),
       ];
       const summary = generateSummary('Test Org', 20, 'REJECT', manyFailChecks, [], 1);
       expect(summary.justification).toContain('Issue 1');
@@ -182,13 +178,13 @@ describe('generateSummary', () => {
 
   describe('REJECT recommendation', () => {
     it('returns REJECT headline', () => {
-      const failChecks = [makeCheck({ name: '501c3_status', result: 'FAIL', detail: 'Not 501(c)(3)' })];
+      const failChecks = [makeCheck({ name: 'years_operating', result: 'FAIL', detail: 'No ruling date' })];
       const summary = generateSummary('Bad Org', 15, 'REJECT', failChecks, [], 0);
       expect(summary.headline).toBe('Does Not Meet Criteria');
     });
 
     it('interpolates score into justification', () => {
-      const failChecks = [makeCheck({ name: '501c3_status', result: 'FAIL', detail: 'Not 501(c)(3)' })];
+      const failChecks = [makeCheck({ name: 'years_operating', result: 'FAIL', detail: 'No ruling date' })];
       const summary = generateSummary('Bad Org', 15, 'REJECT', failChecks, [], 0);
       expect(summary.justification).toContain('15/100');
     });
@@ -198,26 +194,26 @@ describe('generateSummary', () => {
 
   describe('key_factors', () => {
     it('prefixes positive factors with "+"', () => {
-      const checks = [makeCheck({ name: '501c3_status', result: 'PASS' })];
+      const checks = [makeCheck({ name: 'years_operating', result: 'PASS' })];
       const summary = generateSummary('Org', 90, 'PASS', checks, [], 10);
       expect(summary.key_factors[0]).toMatch(/^\+ /);
     });
 
     it('prefixes negative factors with "-"', () => {
-      const checks = [makeCheck({ name: '501c3_status', result: 'FAIL' })];
+      const checks = [makeCheck({ name: 'years_operating', result: 'FAIL' })];
       const summary = generateSummary('Org', 30, 'REJECT', checks, [], 0);
       expect(summary.key_factors[0]).toMatch(/^- /);
     });
 
     it('prefixes neutral factors with "~"', () => {
-      const checks = [makeCheck({ name: '501c3_status', result: 'REVIEW' })];
+      const checks = [makeCheck({ name: 'years_operating', result: 'REVIEW' })];
       const summary = generateSummary('Org', 60, 'REVIEW', checks, [], 2);
       expect(summary.key_factors[0]).toMatch(/^~ /);
     });
 
     it('includes factors for all known checks', () => {
       const summary = generateSummary('Org', 90, 'PASS', allPassChecks, [], 10);
-      expect(summary.key_factors.length).toBe(5);
+      expect(summary.key_factors.length).toBe(4);
     });
 
     it('skips checks with unknown names', () => {
@@ -249,12 +245,11 @@ describe('generateSummary', () => {
     });
 
     it('deduplicates when red flag message already in check factors', () => {
-      // First, add a check factor that contains the same message as a red flag
-      const checks = [makeCheck({ name: '501c3_status', result: 'PASS' })];
-      // '501c3_status' PASS factor = '501(c)(3) tax-exempt status verified'
-      // RED_FLAG_FACTORS['no_990_on_file'] = 'No 990 filings on record'
+      // Check factor for recent_990 FAIL detail contains stale info
+      // RED_FLAG_FACTORS['stale_990'] = 'Financial data is severely outdated'
       // These are different — so both should appear
-      const flags: RedFlag[] = [makeRedFlag({ type: 'no_990_on_file', severity: 'HIGH' })];
+      const checks = [makeCheck({ name: 'years_operating', result: 'PASS' })];
+      const flags: RedFlag[] = [makeRedFlag({ type: 'stale_990', severity: 'HIGH' })];
       const summary = generateSummary('Org', 60, 'REVIEW', checks, flags, 5);
       expect(summary.key_factors.length).toBe(2);
     });

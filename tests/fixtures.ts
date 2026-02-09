@@ -1,10 +1,17 @@
+import { vi } from "vitest";
 import type {
   NonprofitProfile,
   VettingThresholds,
   ProPublica990Filing,
   Latest990Summary,
-} from '../src/domain/nonprofit/types.js';
-import { loadThresholds } from '../src/core/config.js';
+  IrsRevocationRow,
+  IrsRevocationResult,
+  OfacSdnRow,
+  OfacSanctionsResult,
+  CourtListenerCase,
+  CourtRecordsResult,
+} from "../src/domain/nonprofit/types.js";
+import { loadThresholds } from "../src/core/config.js";
 
 /**
  * Canonical defaults from config.ts — single source of truth.
@@ -82,7 +89,9 @@ export function makeProfile(overrides?: Partial<NonprofitProfile>): NonprofitPro
 /**
  * Build a raw ProPublica 990 filing record.
  */
-export function makeFiling(overrides?: Partial<ProPublica990Filing>): ProPublica990Filing {
+export function makeFiling(
+  overrides?: Partial<ProPublica990Filing>,
+): ProPublica990Filing {
   return {
     tax_prd: recentTaxPrd(),
     tax_prd_yr: new Date().getFullYear() - 1,
@@ -92,5 +101,161 @@ export function makeFiling(overrides?: Partial<ProPublica990Filing>): ProPublica
     totassetsend: 1_000_000,
     totliabend: 200_000,
     ...overrides,
+  };
+}
+
+// ============================================================================
+// IRS Fixtures (merged from red-flag-vetting-mcp)
+// ============================================================================
+
+export function makeIrsRow(
+  overrides?: Partial<IrsRevocationRow>,
+): IrsRevocationRow {
+  return {
+    ein: "123456789",
+    legalName: "REVOKED NONPROFIT INC",
+    dba: "",
+    city: "NEW YORK",
+    state: "NY",
+    zip: "10001",
+    country: "US",
+    exemptionType: "03",
+    revocationDate: "2022-05-15",
+    postingDate: "2022-06-01",
+    reinstatementDate: "",
+    ...overrides,
+  };
+}
+
+export function makeCleanIrsResult(): IrsRevocationResult {
+  return {
+    found: false,
+    revoked: false,
+    detail:
+      "EIN not found in IRS auto-revocation list (good — no revocation on record)",
+  };
+}
+
+export function makeRevokedIrsResult(): IrsRevocationResult {
+  return {
+    found: true,
+    revoked: true,
+    detail:
+      "Tax-exempt status REVOKED on 2022-05-15 — failed to file Form 990 for 3 consecutive years",
+    revocationDate: "2022-05-15",
+    legalName: "REVOKED NONPROFIT INC",
+  };
+}
+
+// ============================================================================
+// OFAC Fixtures (merged from red-flag-vetting-mcp)
+// ============================================================================
+
+export function makeOfacRow(overrides?: Partial<OfacSdnRow>): OfacSdnRow {
+  return {
+    entNum: "12345",
+    name: "BAD ACTOR FOUNDATION",
+    sdnType: "Entity",
+    program: "SDGT",
+    title: "",
+    remarks: "",
+    ...overrides,
+  };
+}
+
+export function makeCleanOfacResult(): OfacSanctionsResult {
+  return {
+    found: false,
+    detail: "No OFAC SDN matches found (good — not on sanctions list)",
+    matches: [],
+  };
+}
+
+export function makeMatchedOfacResult(): OfacSanctionsResult {
+  return {
+    found: true,
+    detail: 'OFAC SDN MATCH — 1 sanctioned entity/entities found matching "Bad Actor Foundation"',
+    matches: [
+      {
+        entNum: "12345",
+        name: "BAD ACTOR FOUNDATION",
+        sdnType: "Entity",
+        program: "SDGT",
+        matchedOn: "primary",
+      },
+    ],
+  };
+}
+
+// ============================================================================
+// Court Fixtures (merged from red-flag-vetting-mcp)
+// ============================================================================
+
+export function makeCourtCase(
+  overrides?: Partial<CourtListenerCase>,
+): CourtListenerCase {
+  return {
+    id: 99001,
+    caseName: "USA v. Test Nonprofit Inc",
+    court: "SDNY",
+    dateArgued: null,
+    dateFiled: "2024-06-01",
+    docketNumber: "1:24-cv-01234",
+    absoluteUrl: "/docket/99001/usa-v-test-nonprofit-inc/",
+    ...overrides,
+  };
+}
+
+export function makeCleanCourtResult(): CourtRecordsResult {
+  return {
+    found: false,
+    detail: "No federal court records found (good)",
+    caseCount: 0,
+    cases: [],
+  };
+}
+
+export function makeFlaggedCourtResult(caseCount = 2): CourtRecordsResult {
+  const cases = Array.from({ length: caseCount }, (_, i) =>
+    makeCourtCase({ id: 99001 + i, caseName: `Case ${i + 1}` }),
+  );
+  return {
+    found: true,
+    detail: `${caseCount} federal court case(s) found`,
+    caseCount,
+    cases,
+  };
+}
+
+// ============================================================================
+// Mock Store Factory (for IRS/OFAC client tests)
+// ============================================================================
+
+export function makeMockStore() {
+  return {
+    lookupEin: vi.fn().mockReturnValue(undefined),
+    lookupName: vi.fn().mockReturnValue([]),
+    initialize: vi.fn().mockResolvedValue(undefined),
+    refresh: vi
+      .fn()
+      .mockResolvedValue({ irs_refreshed: true, ofac_refreshed: true }),
+  };
+}
+
+// ============================================================================
+// Mock Client Factories (for gate + scoring integration tests)
+// ============================================================================
+
+/** IRS client that returns "not found" (clean) by default */
+export function makeMockIrsClient() {
+  return {
+    check: vi.fn().mockReturnValue(makeCleanIrsResult()),
+  };
+}
+
+/** OFAC client that returns "no matches" (clean) by default */
+export function makeMockOfacClient() {
+  return {
+    check: vi.fn().mockReturnValue(makeCleanOfacResult()),
   };
 }

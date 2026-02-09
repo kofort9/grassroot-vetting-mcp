@@ -119,9 +119,11 @@ export interface Tier1Result {
   ein: string;
   name: string;
   passed: boolean;
-  score: number;
+  gates: import("../gates/gate-types.js").GateLayerResult;
+  gate_blocked: boolean;
+  score: number | null; // null when gate-blocked
   summary: Tier1Summary;
-  checks: Tier1Check[];
+  checks: Tier1Check[] | null; // null when gate-blocked
   recommendation: "PASS" | "REVIEW" | "REJECT";
   review_reasons: string[];
   red_flags: RedFlag[];
@@ -131,19 +133,17 @@ export interface Tier1Result {
 // Red Flag Types
 // ============================================================================
 
-export type RedFlagSeverity = "HIGH" | "MEDIUM" | "LOW";
+export type RedFlagSeverity = "HIGH" | "MEDIUM";
 
 export type RedFlagType =
-  | "no_990_on_file"
   | "stale_990"
   | "low_fund_deployment"
   | "very_high_overhead"
-  | "no_ruling_date"
   | "very_low_revenue"
   | "revenue_decline"
-  | "not_501c3"
   | "too_new"
-  | "high_officer_compensation";
+  | "high_officer_compensation"
+  | "court_records";
 
 export interface RedFlag {
   severity: RedFlagSeverity;
@@ -163,8 +163,7 @@ export interface RedFlagResult {
 // ============================================================================
 
 export interface VettingThresholds {
-  // Check weights (should sum to 100)
-  weight501c3Status: number;
+  // Check weights (4 checks x 25 = 100; 501c3 moved to gate layer)
   weightYearsOperating: number;
   weightRevenueRange: number;
   weightOverheadRatio: number;
@@ -191,7 +190,7 @@ export interface VettingThresholds {
   filing990ReviewMax: number; // <= this = REVIEW (default: 3)
 
   // Score-based recommendation cutoffs
-  scorePassMin: number; // >= this = PASS (default: 80)
+  scorePassMin: number; // >= this = PASS (default: 75)
   scoreReviewMin: number; // >= this = REVIEW (default: 50)
 
   // Red flag thresholds
@@ -199,12 +198,111 @@ export interface VettingThresholds {
   redFlagHighExpenseRatio: number; // above this = HIGH flag (default: 1.2)
   redFlagLowExpenseRatio: number; // below this = MEDIUM flag (default: 0.5)
   redFlagVeryLowRevenue: number; // below this = MEDIUM flag (default: 25000)
-  redFlagRevenueDeclinePercent: number; // decline > this = MEDIUM flag (default: 0.5)
+  redFlagRevenueDeclinePercent: number; // decline > this = MEDIUM flag (default: 0.2)
   redFlagTooNewYears: number; // operating < this = MEDIUM flag (default: 1)
 
   // Officer compensation thresholds (decimal: 0.40 = 40%)
   redFlagHighCompensation: number; // above this = HIGH flag (default: 0.40)
   redFlagModerateCompensation: number; // above this = MEDIUM flag (default: 0.25)
+}
+
+// ============================================================================
+// IRS Revocation Types (merged from red-flag-vetting-mcp)
+// ============================================================================
+
+export interface IrsRevocationRow {
+  ein: string;
+  legalName: string;
+  dba: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+  exemptionType: string;
+  revocationDate: string;
+  postingDate: string;
+  reinstatementDate: string;
+}
+
+export interface IrsRevocationResult {
+  found: boolean;
+  revoked: boolean;
+  detail: string;
+  revocationDate?: string;
+  reinstatementDate?: string;
+  legalName?: string;
+}
+
+// ============================================================================
+// OFAC SDN Types (merged from red-flag-vetting-mcp)
+// ============================================================================
+
+export interface OfacSdnRow {
+  entNum: string;
+  name: string;
+  sdnType: string;
+  program: string;
+  title: string;
+  remarks: string;
+}
+
+export interface OfacAltRow {
+  entNum: string;
+  altNum: string;
+  altType: string;
+  altName: string;
+  altRemarks: string;
+}
+
+export interface OfacMatch {
+  entNum: string;
+  name: string;
+  sdnType: string;
+  program: string;
+  matchedOn: string; // 'primary' | 'alias'
+}
+
+export interface OfacSanctionsResult {
+  found: boolean;
+  detail: string;
+  matches: OfacMatch[];
+}
+
+// ============================================================================
+// CourtListener Types (merged from red-flag-vetting-mcp)
+// ============================================================================
+
+export interface CourtListenerCase {
+  id: number;
+  caseName: string;
+  court: string;
+  dateArgued: string | null;
+  dateFiled: string | null;
+  docketNumber: string;
+  absoluteUrl: string;
+}
+
+export interface CourtRecordsResult {
+  found: boolean;
+  detail: string;
+  caseCount: number;
+  cases: CourtListenerCase[];
+}
+
+// ============================================================================
+// Data Manifest (tracks CSV freshness)
+// ============================================================================
+
+export interface DataManifest {
+  irs_revocation?: {
+    downloaded_at: string;
+    row_count: number;
+  };
+  ofac_sdn?: {
+    downloaded_at: string;
+    sdn_count: number;
+    alt_count: number;
+  };
 }
 
 // ============================================================================

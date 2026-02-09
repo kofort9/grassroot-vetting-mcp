@@ -10,10 +10,14 @@ import {
   VettingThresholds,
   ProPublicaOrgDetailResponse,
   ProPublica990Filing,
+  CourtRecordsResult,
 } from "./types.js";
 import { runTier1Checks, runRedFlagCheck } from "./scoring.js";
 import { resolveThresholds } from "./sector-thresholds.js";
 import { logDebug, logError } from "../../core/logging.js";
+import type { IrsRevocationClient } from "../red-flags/irs-revocation-client.js";
+import type { OfacSdnClient } from "../red-flags/ofac-sdn-client.js";
+import type { CourtListenerClient } from "../red-flags/courtlistener-client.js";
 
 const ATTRIBUTION =
   "Data provided by ProPublica Nonprofit Explorer (https://projects.propublica.org/nonprofits/)";
@@ -110,7 +114,10 @@ async function withEinLookup<T>(
   client: ProPublicaClient,
   ein: string,
   toolName: string,
-  fn: (profile: NonprofitProfile, filings: ProPublica990Filing[]) => T,
+  fn: (
+    profile: NonprofitProfile,
+    filings: ProPublica990Filing[],
+  ) => Promise<T>,
 ): Promise<ToolResponse<T>> {
   try {
     if (!ein) {
@@ -135,7 +142,7 @@ async function withEinLookup<T>(
     const { profile, filings } = buildProfile(response);
     return {
       success: true,
-      data: fn(profile, filings),
+      data: await fn(profile, filings),
       attribution: ATTRIBUTION,
     };
   } catch (error) {
@@ -237,24 +244,46 @@ export async function getNonprofitProfile(
     client,
     input.ein,
     "getNonprofitProfile",
-    (profile) => profile,
+    async (profile) => profile,
   );
 }
 
 /**
- * check_tier1 - Run Tier 1 vetting checks
+ * check_tier1 - Run Tier 1 vetting checks (gates → scoring → red flags)
  */
 export async function checkTier1(
   client: ProPublicaClient,
   input: CheckTier1Input,
   thresholds: VettingThresholds,
+  irsClient: IrsRevocationClient,
+  ofacClient: OfacSdnClient,
+  courtClient?: CourtListenerClient,
 ): Promise<ToolResponse<Tier1Result>> {
-  return withEinLookup(client, input.ein, "checkTier1", (profile, filings) =>
-    runTier1Checks(
-      profile,
-      filings,
-      resolveThresholds(thresholds, profile.ntee_code),
-    ),
+  return withEinLookup(
+    client,
+    input.ein,
+    "checkTier1",
+    async (profile, filings) => {
+      let courtResult: CourtRecordsResult | undefined;
+      if (courtClient) {
+        try {
+          courtResult = await courtClient.searchByOrgName(profile.name);
+        } catch (err) {
+          logError(
+            "Court record lookup failed (non-blocking):",
+            err instanceof Error ? err.message : String(err),
+          );
+        }
+      }
+      return runTier1Checks(
+        profile,
+        filings,
+        resolveThresholds(thresholds, profile.ntee_code),
+        irsClient,
+        ofacClient,
+        courtResult,
+      );
+    },
   );
 }
 
@@ -265,12 +294,30 @@ export async function getRedFlags(
   client: ProPublicaClient,
   input: GetRedFlagsInput,
   thresholds: VettingThresholds,
+  courtClient?: CourtListenerClient,
 ): Promise<ToolResponse<RedFlagResult>> {
-  return withEinLookup(client, input.ein, "getRedFlags", (profile, filings) =>
-    runRedFlagCheck(
-      profile,
-      filings,
-      resolveThresholds(thresholds, profile.ntee_code),
-    ),
+  return withEinLookup(
+    client,
+    input.ein,
+    "getRedFlags",
+    async (profile, filings) => {
+      let courtResult: CourtRecordsResult | undefined;
+      if (courtClient) {
+        try {
+          courtResult = await courtClient.searchByOrgName(profile.name);
+        } catch (err) {
+          logError(
+            "Court record lookup failed (non-blocking):",
+            err instanceof Error ? err.message : String(err),
+          );
+        }
+      }
+      return runRedFlagCheck(
+        profile,
+        filings,
+        resolveThresholds(thresholds, profile.ntee_code),
+        courtResult,
+      );
+    },
   );
 }

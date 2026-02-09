@@ -10,19 +10,19 @@ describe('validateThresholds', () => {
   // --- Weight validation ---
 
   it('rejects weights that do not sum to 100', () => {
-    const t = makeThresholds({ weight501c3Status: 50 }); // sum = 120
+    const t = makeThresholds({ weightYearsOperating: 50 }); // sum = 125
     expect(() => validateThresholds(t)).toThrow(/Weights must sum to 100/);
   });
 
   it('rejects negative weights', () => {
-    // Adjust another weight to keep sum at 100 but with a negative
-    const t = makeThresholds({ weight501c3Status: -10, weightYearsOperating: 55 });
+    // Keep sum at 100 but with a negative: -10 + 60 + 25 + 25 = 100
+    const t = makeThresholds({ weightYearsOperating: -10, weightRevenueRange: 60 });
     expect(() => validateThresholds(t)).toThrow(/non-negative/);
   });
 
   it('accepts zero weight (disabling a check)', () => {
-    // sum still 100: 0 + 45 + 20 + 20 + 15 = 100
-    const t = makeThresholds({ weight501c3Status: 0, weightYearsOperating: 45 });
+    // sum still 100: 0 + 50 + 25 + 25 = 100
+    const t = makeThresholds({ weightYearsOperating: 0, weightRevenueRange: 50 });
     expect(() => validateThresholds(t)).not.toThrow();
   });
 
@@ -109,7 +109,7 @@ describe('validateThresholds', () => {
 
   it('reports multiple errors at once', () => {
     const t = makeThresholds({
-      weight501c3Status: -5,
+      weightYearsOperating: -5,
       revenueFailMin: 200_000,
       scorePassMin: 101,
     });

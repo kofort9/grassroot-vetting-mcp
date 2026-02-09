@@ -26,3 +26,7 @@ export function logDebug(message: string, ...args: unknown[]): void {
   if (!DEBUG_ENABLED) return;
   console.error(format("DEBUG", message), ...args);
 }
+
+export function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

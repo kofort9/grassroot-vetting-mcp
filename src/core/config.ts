@@ -1,16 +1,29 @@
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import { VettingThresholds } from "../domain/nonprofit/types.js";
 
 // Load environment variables
 dotenv.config();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export interface ProPublicaConfig {
   apiBaseUrl: string;
   rateLimitMs: number;
 }
 
+export interface RedFlagConfig {
+  courtlistenerApiToken?: string;
+  courtlistenerBaseUrl: string;
+  courtlistenerRateLimitMs: number;
+  dataDir: string;
+  dataMaxAgeDays: number;
+}
+
 export interface AppConfig {
   propublica: ProPublicaConfig;
+  redFlag: RedFlagConfig;
   thresholds: VettingThresholds;
 }
 
@@ -56,12 +69,11 @@ export function loadProPublicaConfig(): ProPublicaConfig {
  */
 export function loadThresholds(): VettingThresholds {
   return {
-    // Check weights (sum to 100)
-    weight501c3Status: envInt("VETTING_WEIGHT_501C3", 30),
-    weightYearsOperating: envInt("VETTING_WEIGHT_YEARS", 15),
-    weightRevenueRange: envInt("VETTING_WEIGHT_REVENUE", 20),
-    weightOverheadRatio: envInt("VETTING_WEIGHT_OVERHEAD", 20),
-    weightRecent990: envInt("VETTING_WEIGHT_990", 15),
+    // Check weights (4 checks x 25 = 100; 501c3 moved to gate layer)
+    weightYearsOperating: envInt("VETTING_WEIGHT_YEARS", 25),
+    weightRevenueRange: envInt("VETTING_WEIGHT_REVENUE", 25),
+    weightOverheadRatio: envInt("VETTING_WEIGHT_OVERHEAD", 25),
+    weightRecent990: envInt("VETTING_WEIGHT_990", 25),
 
     // Years operating
     yearsPassMin: envInt("VETTING_YEARS_PASS_MIN", 3),
@@ -83,8 +95,8 @@ export function loadThresholds(): VettingThresholds {
     filing990PassMax: envInt("VETTING_990_PASS_MAX_YEARS", 2),
     filing990ReviewMax: envInt("VETTING_990_REVIEW_MAX_YEARS", 3),
 
-    // Score cutoffs
-    scorePassMin: envInt("VETTING_SCORE_PASS_MIN", 80),
+    // Score cutoffs (75 threshold: gates handle binary disqualifiers, scoring is more forgiving)
+    scorePassMin: envInt("VETTING_SCORE_PASS_MIN", 75),
     scoreReviewMin: envInt("VETTING_SCORE_REVIEW_MIN", 50),
 
     // Red flag thresholds
@@ -94,7 +106,7 @@ export function loadThresholds(): VettingThresholds {
     redFlagVeryLowRevenue: envInt("VETTING_RF_VERY_LOW_REVENUE", 25000),
     redFlagRevenueDeclinePercent: envFloat(
       "VETTING_RF_REVENUE_DECLINE_PCT",
-      0.5,
+      0.2,
     ),
     redFlagTooNewYears: envInt("VETTING_RF_TOO_NEW_YEARS", 1),
 
@@ -115,7 +127,6 @@ export function validateThresholds(t: VettingThresholds): void {
   const errors: string[] = [];
 
   const weights = [
-    t.weight501c3Status,
     t.weightYearsOperating,
     t.weightRevenueRange,
     t.weightOverheadRatio,
@@ -185,6 +196,25 @@ export function validateThresholds(t: VettingThresholds): void {
   }
 }
 
+// Security: Only allow official CourtListener endpoint
+const COURTLISTENER_BASE_URL = "https://www.courtlistener.com/api/rest/v4";
+
+/**
+ * Loads red flag data source configuration from environment variables.
+ */
+export function loadRedFlagConfig(): RedFlagConfig {
+  return {
+    courtlistenerApiToken: process.env.COURTLISTENER_API_TOKEN || undefined,
+    courtlistenerBaseUrl: COURTLISTENER_BASE_URL,
+    courtlistenerRateLimitMs: Math.max(
+      100,
+      envInt("COURTLISTENER_RATE_LIMIT_MS", 500),
+    ),
+    dataDir: path.resolve(__dirname, "../../data"),
+    dataMaxAgeDays: Math.max(1, envInt("DATA_MAX_AGE_DAYS", 7)),
+  };
+}
+
 /**
  * Loads full application config — backward compatible via loadConfig()
  */
@@ -193,6 +223,7 @@ export function loadConfig(): AppConfig {
   validateThresholds(thresholds);
   return {
     propublica: loadProPublicaConfig(),
+    redFlag: loadRedFlagConfig(),
     thresholds,
   };
 }

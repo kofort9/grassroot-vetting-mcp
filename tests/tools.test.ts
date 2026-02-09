@@ -10,7 +10,12 @@ import type {
   ProPublicaOrgDetailResponse,
   ProPublicaSearchResponse,
 } from '../src/domain/nonprofit/types.js';
-import { DEFAULT_THRESHOLDS, makeFiling } from './fixtures.js';
+import {
+  DEFAULT_THRESHOLDS,
+  makeFiling,
+  makeMockIrsClient,
+  makeMockOfacClient,
+} from './fixtures.js';
 
 // ============================================================================
 // Mock ProPublicaClient
@@ -227,56 +232,75 @@ describe('getNonprofitProfile', () => {
 
 describe('checkTier1', () => {
   let client: ProPublicaClient;
+  let irsClient: ReturnType<typeof makeMockIrsClient>;
+  let ofacClient: ReturnType<typeof makeMockOfacClient>;
 
   beforeEach(() => {
     client = makeMockClient();
+    irsClient = makeMockIrsClient();
+    ofacClient = makeMockOfacClient();
   });
 
   it('returns error for missing EIN', async () => {
-    const result = await checkTier1(client, { ein: '' }, t);
+    const result = await checkTier1(client, { ein: '' }, t, irsClient as any, ofacClient as any);
     expect(result.success).toBe(false);
     expect(result.error).toContain('required');
   });
 
   it('returns error when organization not found', async () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-    const result = await checkTier1(client, { ein: '12-3456789' }, t);
+    const result = await checkTier1(client, { ein: '12-3456789' }, t, irsClient as any, ofacClient as any);
     expect(result.success).toBe(false);
     expect(result.error).toContain('not found');
   });
 
   it('returns Tier1Result on success', async () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(makeOrgResponse());
-    const result = await checkTier1(client, { ein: '95-3135649' }, t);
+    const result = await checkTier1(client, { ein: '95-3135649' }, t, irsClient as any, ofacClient as any);
 
     expect(result.success).toBe(true);
     expect(result.data).toBeDefined();
     expect(result.data?.ein).toBe('95-3135649');
     expect(result.data?.checks).toBeInstanceOf(Array);
-    expect(result.data?.checks.length).toBe(5);
+    expect(result.data?.checks!.length).toBe(4);
     expect(result.data?.score).toBeTypeOf('number');
     expect(result.data?.recommendation).toMatch(/^(PASS|REVIEW|REJECT)$/);
+    expect(result.data?.gates).toBeDefined();
+    expect(result.data?.gate_blocked).toBe(false);
   });
 
   it('healthy org passes with default thresholds', async () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(makeOrgResponse());
-    const result = await checkTier1(client, { ein: '95-3135649' }, t);
+    const result = await checkTier1(client, { ein: '95-3135649' }, t, irsClient as any, ofacClient as any);
     expect(result.data?.recommendation).toBe('PASS');
-    expect(result.data?.score).toBeGreaterThanOrEqual(80);
+    expect(result.data?.score).toBeGreaterThanOrEqual(75);
   });
 
   it('includes summary in result', async () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(makeOrgResponse());
-    const result = await checkTier1(client, { ein: '95-3135649' }, t);
+    const result = await checkTier1(client, { ein: '95-3135649' }, t, irsClient as any, ofacClient as any);
     expect(result.data?.summary).toBeDefined();
     expect(result.data?.summary.headline).toBeTypeOf('string');
     expect(result.data?.summary.key_factors).toBeInstanceOf(Array);
     expect(result.data?.summary.next_steps).toBeInstanceOf(Array);
   });
 
+  it('returns gate-blocked result when gates fail', async () => {
+    const response = makeOrgResponse();
+    response.organization.subsection_code = 6; // Non-501(c)(3) → Gate 1 fail
+    (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(response);
+    const result = await checkTier1(client, { ein: '95-3135649' }, t, irsClient as any, ofacClient as any);
+
+    expect(result.success).toBe(true);
+    expect(result.data?.gate_blocked).toBe(true);
+    expect(result.data?.score).toBeNull();
+    expect(result.data?.checks).toBeNull();
+    expect(result.data?.recommendation).toBe('REJECT');
+  });
+
   it('handles client error gracefully', async () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('API down'));
-    const result = await checkTier1(client, { ein: '95-3135649' }, t);
+    const result = await checkTier1(client, { ein: '95-3135649' }, t, irsClient as any, ofacClient as any);
     expect(result.success).toBe(false);
     expect(result.error).toContain('API down');
   });
@@ -317,8 +341,10 @@ describe('getRedFlags', () => {
   });
 
   it('detects red flags for problematic org', async () => {
-    const response = makeOrgResponse({ filings_with_data: [] });
-    response.organization.subsection_code = 6;
+    // Use stale 990 + very low revenue to trigger red flags (gate-handled flags removed)
+    const response = makeOrgResponse({
+      filings_with_data: [makeFiling({ tax_prd: 201806, tax_prd_yr: 2018, totrevenue: 5_000 })],
+    });
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(response);
     const result = await getRedFlags(client, { ein: '95-3135649' }, t);
 
@@ -328,13 +354,14 @@ describe('getRedFlags', () => {
   });
 
   it('each flag has severity, type, and detail', async () => {
-    const response = makeOrgResponse({ filings_with_data: [] });
-    response.organization.subsection_code = 6;
+    const response = makeOrgResponse({
+      filings_with_data: [makeFiling({ tax_prd: 201806, tax_prd_yr: 2018, totrevenue: 5_000 })],
+    });
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(response);
     const result = await getRedFlags(client, { ein: '95-3135649' }, t);
 
     for (const flag of result.data!.flags) {
-      expect(flag.severity).toMatch(/^(HIGH|MEDIUM|LOW)$/);
+      expect(flag.severity).toMatch(/^(HIGH|MEDIUM)$/);
       expect(flag.type).toBeTypeOf('string');
       expect(flag.detail).toBeTypeOf('string');
     }

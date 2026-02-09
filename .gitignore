@@ -29,3 +29,6 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+
+# Downloaded data (IRS revocation list, OFAC SDN)
+data/
