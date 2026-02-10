@@ -7,6 +7,7 @@ import {
 import { loadConfig } from "../core/config.js";
 import { ProPublicaClient } from "../domain/nonprofit/propublica-client.js";
 import { CsvDataStore } from "../data-sources/csv-data-store.js";
+import { VettingStore } from "../data-sources/vetting-store.js";
 import { IrsRevocationClient } from "../domain/red-flags/irs-revocation-client.js";
 import { OfacSdnClient } from "../domain/red-flags/ofac-sdn-client.js";
 import { CourtListenerClient } from "../domain/red-flags/courtlistener-client.js";
@@ -31,6 +32,9 @@ const ofacClient = new OfacSdnClient(dataStore);
 const courtClient = config.redFlag.courtlistenerApiToken
   ? new CourtListenerClient(config.redFlag)
   : undefined;
+
+// Vetting result persistence (SQLite, same dataDir as IRS/OFAC caches)
+const vettingStore = new VettingStore(config.redFlag.dataDir);
 
 // Create MCP server instance
 const server = new Server(
@@ -92,7 +96,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "check_tier1",
         description:
-          "Run Tier 1 vetting. Three layers: (1) Pre-screen gates — verified 501(c)(3), OFAC sanctions, 990 filing exists. (2) Scoring engine — years, revenue, expense ratio, 990 recency (100 pts). (3) Red flag overlay. Thresholds: 75+ PASS, 50-74 REVIEW, <50 REJECT.",
+          "Run Tier 1 vetting. Three layers: (1) Pre-screen gates — verified 501(c)(3), OFAC sanctions, 990 filing exists. (2) Scoring engine — years, revenue, expense ratio, 990 recency (100 pts). (3) Red flag overlay. Thresholds: 75+ PASS, 50-74 REVIEW, <50 REJECT. Results are saved and cached — re-vetting returns the cached result unless force_refresh is true.",
         inputSchema: {
           type: "object",
           properties: {
@@ -100,6 +104,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description:
                 'Employer Identification Number (EIN). Accepts formats: "12-3456789" or "123456789"',
+            },
+            force_refresh: {
+              type: "boolean",
+              description:
+                "Skip cached result and re-run the full vetting pipeline. Default: false.",
             },
           },
           required: ["ein"],
@@ -138,6 +147,30 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["source"],
         },
       },
+      {
+        name: "list_vetted",
+        description:
+          "List previously vetted nonprofits with summary stats. Filter by recommendation or date.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            recommendation: {
+              type: "string",
+              enum: ["PASS", "REVIEW", "REJECT"],
+              description: "Filter by recommendation outcome.",
+            },
+            since: {
+              type: "string",
+              description:
+                "Only show results vetted after this ISO date (e.g., 2026-01-01).",
+            },
+            limit: {
+              type: "number",
+              description: "Max results to return (default 20, max 100).",
+            },
+          },
+        },
+      },
     ],
   };
 });
@@ -167,6 +200,21 @@ function argStringOpt(
   return typeof val === "string" ? val : undefined;
 }
 
+function argBool(
+  args: Record<string, unknown> | undefined,
+  key: string,
+): boolean {
+  return args?.[key] === true;
+}
+
+function argNumber(
+  args: Record<string, unknown> | undefined,
+  key: string,
+): number | undefined {
+  const val = args?.[key];
+  return typeof val === "number" ? val : undefined;
+}
+
 // Handle call_tool request
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
@@ -191,16 +239,46 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     if (name === "check_tier1") {
-      return formatToolResponse(
-        await tools.checkTier1(
-          propublicaClient,
-          { ein: argString(args, "ein") },
-          thresholds,
-          irsClient,
-          ofacClient,
-          courtClient,
-        ),
+      const ein = argString(args, "ein");
+      const forceRefresh = argBool(args, "force_refresh");
+
+      // Dedup: return cached result unless force_refresh
+      if (!forceRefresh) {
+        const cached = vettingStore.getLatestByEin(ein);
+        if (cached) {
+          const cachedResult = JSON.parse(cached.result_json);
+          return formatToolResponse({
+            success: true,
+            data: cachedResult,
+            cached: true,
+            cached_note: `Previously vetted on ${cached.vetted_at} by ${cached.vetted_by}. Use force_refresh: true to re-vet.`,
+            attribution: "ProPublica Nonprofit Explorer API",
+          });
+        }
+      }
+
+      const result = await tools.checkTier1(
+        propublicaClient,
+        { ein },
+        thresholds,
+        irsClient,
+        ofacClient,
+        courtClient,
       );
+
+      // Persist on success (non-blocking — errors logged, not thrown)
+      if (result.success && result.data) {
+        try {
+          vettingStore.saveResult(result.data);
+        } catch (err) {
+          logError(
+            "Failed to save vetting result:",
+            err instanceof Error ? err.message : String(err),
+          );
+        }
+      }
+
+      return formatToolResponse(result);
     }
 
     if (name === "get_red_flags") {
@@ -241,6 +319,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
     }
 
+    if (name === "list_vetted") {
+      const results = vettingStore.listVetted({
+        recommendation: argStringOpt(args, "recommendation") as
+          | "PASS"
+          | "REVIEW"
+          | "REJECT"
+          | undefined,
+        since: argStringOpt(args, "since"),
+        limit: argNumber(args, "limit"),
+      });
+      const stats = vettingStore.getStats();
+      return formatToolResponse({
+        success: true,
+        data: {
+          results: results.map((r) => ({
+            ein: r.ein,
+            name: r.name,
+            recommendation: r.recommendation,
+            score: r.score,
+            red_flag_count: r.red_flag_count,
+            vetted_at: r.vetted_at,
+            vetted_by: r.vetted_by,
+          })),
+          stats,
+        },
+        attribution: "",
+      });
+    }
+
     throw new Error(`Unknown tool: ${name}`);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -264,6 +371,16 @@ export async function startServer(): Promise<void> {
     );
   }
 
+  // Initialize vetting result persistence (SQLite)
+  try {
+    vettingStore.initialize();
+  } catch (err) {
+    logError(
+      "VettingStore initialization failed (persistence disabled):",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
   logInfo(`${SERVER_NAME} v${SERVER_VERSION} running on stdio`);
@@ -272,10 +389,12 @@ export async function startServer(): Promise<void> {
 // Graceful shutdown
 process.on("SIGINT", () => {
   logInfo("Received SIGINT, shutting down...");
+  vettingStore.close();
   process.exit(0);
 });
 
 process.on("SIGTERM", () => {
   logInfo("Received SIGTERM, shutting down...");
+  vettingStore.close();
   process.exit(0);
 });

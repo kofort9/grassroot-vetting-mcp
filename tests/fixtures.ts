@@ -10,6 +10,7 @@ import type {
   OfacSanctionsResult,
   CourtListenerCase,
   CourtRecordsResult,
+  Tier1Result,
 } from "../src/domain/nonprofit/types.js";
 import { loadThresholds } from "../src/core/config.js";
 
@@ -257,5 +258,33 @@ export function makeMockIrsClient() {
 export function makeMockOfacClient() {
   return {
     check: vi.fn().mockReturnValue(makeCleanOfacResult()),
+  };
+}
+
+// ============================================================================
+// Tier 1 Result Factory (for VettingStore tests)
+// ============================================================================
+
+export function makeTier1Result(
+  overrides?: Partial<Tier1Result>,
+): Tier1Result {
+  return {
+    ein: "95-3135649",
+    name: "Test Nonprofit",
+    passed: true,
+    gates: { all_passed: true, gates: [] },
+    gate_blocked: false,
+    score: 85,
+    summary: {
+      headline: "PASS — Strong indicators",
+      justification: "Test nonprofit passes all checks.",
+      key_factors: ["+ Years operating: 15"],
+      next_steps: ["Schedule site visit"],
+    },
+    checks: [],
+    recommendation: "PASS",
+    review_reasons: [],
+    red_flags: [],
+    ...overrides,
   };
 }

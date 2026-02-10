@@ -114,10 +114,7 @@ async function withEinLookup<T>(
   client: ProPublicaClient,
   ein: string,
   toolName: string,
-  fn: (
-    profile: NonprofitProfile,
-    filings: ProPublica990Filing[],
-  ) => Promise<T>,
+  fn: (profile: NonprofitProfile, filings: ProPublica990Filing[]) => Promise<T>,
 ): Promise<ToolResponse<T>> {
   try {
     if (!ein) {
