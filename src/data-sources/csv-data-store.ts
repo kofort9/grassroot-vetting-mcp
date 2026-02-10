@@ -28,8 +28,8 @@ const OFAC_ALT_URL = "https://www.treasury.gov/ofac/downloads/alt.csv";
 const MANIFEST_FILE = "data-manifest.json";
 
 // Safety limits to prevent zip bomb / data poisoning
-const MAX_ZIP_SIZE_BYTES = 100 * 1024 * 1024; // 100MB uncompressed limit
-const MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024; // 50MB download limit
+const MAX_ZIP_SIZE_BYTES = 200 * 1024 * 1024; // 200MB uncompressed limit (IRS list is ~142MB as of 2026)
+const MAX_DOWNLOAD_BYTES = 60 * 1024 * 1024; // 60MB download limit
 const MIN_IRS_ROWS = 400_000; // IRS list has ~600K rows; below this suggests corruption
 const MIN_OFAC_ENTRIES = 4_000; // OFAC SDN has ~12K entries; below this suggests corruption
 const REFRESH_COOLDOWN_MS = 60_000; // Minimum 60s between refresh calls

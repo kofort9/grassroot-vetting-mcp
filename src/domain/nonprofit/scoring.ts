@@ -179,7 +179,10 @@ export function checkRecent990(
   } else {
     const yearsAgo = yearsFromTaxPeriod(taxPeriod);
 
-    if (yearsAgo <= t.filing990PassMax) {
+    if (!Number.isFinite(yearsAgo)) {
+      result = "FAIL";
+      detail = `Most recent 990 from ${taxPeriod} - tax period could not be parsed`;
+    } else if (yearsAgo <= t.filing990PassMax) {
       result = "PASS";
       detail = `Most recent 990 from ${taxPeriod} (${profile.latest_990?.form_type})`;
     } else if (yearsAgo <= t.filing990ReviewMax) {

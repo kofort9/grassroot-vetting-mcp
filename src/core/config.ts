@@ -92,8 +92,8 @@ export function loadThresholds(): VettingThresholds {
     expenseRatioLowReview: envFloat("VETTING_EXPENSE_RATIO_LOW_REVIEW", 0.5),
 
     // 990 filing recency (years)
-    filing990PassMax: envInt("VETTING_990_PASS_MAX_YEARS", 2),
-    filing990ReviewMax: envInt("VETTING_990_REVIEW_MAX_YEARS", 3),
+    filing990PassMax: envInt("VETTING_990_PASS_MAX_YEARS", 3),
+    filing990ReviewMax: envInt("VETTING_990_REVIEW_MAX_YEARS", 4),
 
     // Score cutoffs (75 threshold: gates handle binary disqualifiers, scoring is more forgiving)
     scorePassMin: envInt("VETTING_SCORE_PASS_MIN", 75),

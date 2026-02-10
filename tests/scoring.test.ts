@@ -172,6 +172,7 @@ describe('checkRecent990', () => {
     );
     expect(result.result).toBe('FAIL');
     expect(result.detail).not.toContain('NaN');
+    expect(result.detail).toContain('could not be parsed');
   });
 });
 
