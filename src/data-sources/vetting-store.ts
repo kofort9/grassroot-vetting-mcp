@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import path from "path";
 import { Tier1Result } from "../domain/nonprofit/types.js";
-import { logInfo } from "../core/logging.js";
+import { logInfo, logWarn } from "../core/logging.js";
 
 export interface VettedRecord {
   id: number;
@@ -125,13 +125,21 @@ export class VettingStore {
     }
 
     if (options?.since) {
+      if (!/^\d{4}-\d{2}-\d{2}/.test(options.since)) {
+        throw new Error(
+          `Invalid since date format: "${options.since}". Expected ISO 8601 (e.g., "2026-01-01").`,
+        );
+      }
       conditions.push("vetted_at >= ?");
       params.push(options.since);
     }
 
     const where =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-    const limit = Math.min(options?.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
+    const limit = Math.max(
+      1,
+      Math.min(options?.limit ?? DEFAULT_LIMIT, MAX_LIMIT),
+    );
 
     const rows = this.db!.prepare(
       `SELECT * FROM vetting_results ${where} ORDER BY vetted_at DESC, id DESC LIMIT ?`,
@@ -166,8 +174,10 @@ export class VettingStore {
     if (this.db) {
       try {
         this.db.close();
-      } catch {
-        // Already closed — safe to ignore
+      } catch (err) {
+        logWarn(
+          `VettingStore.close(): ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
       this.db = null;
     }

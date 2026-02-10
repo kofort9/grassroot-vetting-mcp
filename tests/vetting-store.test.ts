@@ -192,4 +192,20 @@ describe("VettingStore", () => {
     // Second close should not throw
     expect(() => store.close()).not.toThrow();
   });
+
+  it("listVetted({ limit }) clamps negative values to 1", () => {
+    store.initialize();
+    store.saveResult(makeTier1Result({ ein: "111111111" }));
+
+    const results = store.listVetted({ limit: -5 });
+    expect(results).toHaveLength(1);
+  });
+
+  it("listVetted({ since }) rejects invalid date format", () => {
+    store.initialize();
+
+    expect(() => store.listVetted({ since: "not-a-date" })).toThrow(
+      /Invalid since date format/,
+    );
+  });
 });

@@ -35,6 +35,7 @@ const courtClient = config.redFlag.courtlistenerApiToken
 
 // Vetting result persistence (SQLite, same dataDir as IRS/OFAC caches)
 const vettingStore = new VettingStore(config.redFlag.dataDir);
+let vettingStoreReady = false;
 
 // Create MCP server instance
 const server = new Server(
@@ -243,7 +244,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const forceRefresh = argBool(args, "force_refresh");
 
       // Dedup: return cached result unless force_refresh
-      if (!forceRefresh) {
+      if (!forceRefresh && vettingStoreReady) {
         const cached = vettingStore.getLatestByEin(ein);
         if (cached) {
           const cachedResult = JSON.parse(cached.result_json);
@@ -267,7 +268,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       );
 
       // Persist on success (non-blocking — errors logged, not thrown)
-      if (result.success && result.data) {
+      if (result.success && result.data && vettingStoreReady) {
         try {
           vettingStore.saveResult(result.data);
         } catch (err) {
@@ -320,6 +321,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     if (name === "list_vetted") {
+      if (!vettingStoreReady) {
+        return formatToolResponse({
+          success: false,
+          error:
+            "VettingStore not available. Check server logs for initialization errors.",
+          attribution: "",
+        });
+      }
       const results = vettingStore.listVetted({
         recommendation: argStringOpt(args, "recommendation") as
           | "PASS"
@@ -338,6 +347,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             name: r.name,
             recommendation: r.recommendation,
             score: r.score,
+            gate_blocked: r.gate_blocked,
             red_flag_count: r.red_flag_count,
             vetted_at: r.vetted_at,
             vetted_by: r.vetted_by,
@@ -374,6 +384,7 @@ export async function startServer(): Promise<void> {
   // Initialize vetting result persistence (SQLite)
   try {
     vettingStore.initialize();
+    vettingStoreReady = true;
   } catch (err) {
     logError(
       "VettingStore initialization failed (persistence disabled):",
