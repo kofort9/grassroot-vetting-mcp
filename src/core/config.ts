@@ -1,7 +1,11 @@
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import { VettingThresholds, PortfolioFitConfig } from "../domain/nonprofit/types.js";
+import {
+  VettingThresholds,
+  PortfolioFitConfig,
+} from "../domain/nonprofit/types.js";
+import type { DiscoveryIndexConfig } from "../domain/discovery/types.js";
 
 // Load environment variables
 dotenv.config();
@@ -26,6 +30,7 @@ export interface AppConfig {
   redFlag: RedFlagConfig;
   thresholds: VettingThresholds;
   portfolioFit: PortfolioFitConfig;
+  discovery: DiscoveryIndexConfig;
 }
 
 // Security: Only allow official ProPublica API endpoint
@@ -222,14 +227,34 @@ export function loadRedFlagConfig(): RedFlagConfig {
 
 /** Default NTEE allowlist: all major categories except Q, T, V, X, Y, Z */
 const DEFAULT_ALLOWED_NTEE = [
-  "A", "B", "C", "D", "E", "F", "G",
-  "H", "I", "J", "K", "L", "M",
-  "N", "O", "P", "R", "S", "U", "W",
+  "A",
+  "B",
+  "C",
+  "D",
+  "E",
+  "F",
+  "G",
+  "H",
+  "I",
+  "J",
+  "K",
+  "L",
+  "M",
+  "N",
+  "O",
+  "P",
+  "R",
+  "S",
+  "U",
+  "W",
 ];
 
 function parseEinList(raw?: string): string[] {
   if (!raw) return [];
-  return raw.split(",").map(s => s.trim().replace(/[-\s]/g, "")).filter(Boolean);
+  return raw
+    .split(",")
+    .map((s) => s.trim().replace(/[-\s]/g, ""))
+    .filter(Boolean);
 }
 
 /**
@@ -243,10 +268,41 @@ export function loadPortfolioFitConfig(): PortfolioFitConfig {
       (process.env.PORTFOLIO_FIT_ENABLED ?? "").trim().toLowerCase(),
     ),
     allowedNteeCategories: raw
-      ? raw.split(",").map(s => s.trim().toUpperCase()).filter(Boolean)
+      ? raw
+          .split(",")
+          .map((s) => s.trim().toUpperCase())
+          .filter(Boolean)
       : DEFAULT_ALLOWED_NTEE,
     excludedEins: parseEinList(process.env.PORTFOLIO_FIT_EXCLUDED_EINS),
     includedEins: parseEinList(process.env.PORTFOLIO_FIT_INCLUDED_EINS),
+  };
+}
+
+// ============================================================================
+// Discovery Index Config
+// ============================================================================
+
+/** IRS EO BMF region files (4 regions covering all US states). */
+const DEFAULT_BMF_REGIONS = ["eo1", "eo2", "eo3", "eo4"];
+
+/**
+ * Loads discovery index configuration from environment variables.
+ */
+export function loadDiscoveryConfig(): DiscoveryIndexConfig {
+  const rawRegions = process.env.DISCOVERY_BMF_REGIONS;
+  return {
+    dataDir: path.resolve(__dirname, "../../data"),
+    bmfRegions: rawRegions
+      ? rawRegions
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : DEFAULT_BMF_REGIONS,
+    dataMaxAgeDays: Math.max(1, envInt("DISCOVERY_MAX_AGE_DAYS", 30)),
+    maxOrgsPerQuery: Math.min(
+      1000,
+      Math.max(1, envInt("DISCOVERY_MAX_RESULTS", 500)),
+    ),
   };
 }
 
@@ -261,5 +317,6 @@ export function loadConfig(): AppConfig {
     redFlag: loadRedFlagConfig(),
     thresholds,
     portfolioFit: loadPortfolioFitConfig(),
+    discovery: loadDiscoveryConfig(),
   };
 }
