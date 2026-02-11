@@ -43,8 +43,7 @@ vi.mock("../src/core/logging.js", () => ({
   logError: vi.fn(),
   logWarn: vi.fn(),
   logDebug: vi.fn(),
-  getErrorMessage: (e: unknown) =>
-    e instanceof Error ? e.message : String(e),
+  getErrorMessage: (e: unknown) => (e instanceof Error ? e.message : String(e)),
 }));
 
 import axios from "axios";
@@ -87,7 +86,9 @@ function makeIrsCsv(rowCount: number): string {
  * Generate a minimal OFAC SDN CSV with N rows.
  * No header — positional: entNum, name, sdnType, program, title, remarks
  */
-function makeOfacSdnCsv(rows: Array<{ entNum: string; name: string; sdnType?: string }>): string {
+function makeOfacSdnCsv(
+  rows: Array<{ entNum: string; name: string; sdnType?: string }>,
+): string {
   return rows
     .map(
       (r) =>
@@ -100,7 +101,9 @@ function makeOfacSdnCsv(rows: Array<{ entNum: string; name: string; sdnType?: st
  * Generate OFAC alt-names CSV.
  * No header — positional: entNum, altNum, altType, altName, altRemarks
  */
-function makeOfacAltCsv(rows: Array<{ entNum: string; altName: string }>): string {
+function makeOfacAltCsv(
+  rows: Array<{ entNum: string; altName: string }>,
+): string {
   return rows
     .map((r) => `"${r.entNum}","1","aka","${r.altName}",""`)
     .join("\n");
@@ -127,7 +130,8 @@ function setupIrsDisk(csvContent: string) {
   (fsp.readFile as ReturnType<typeof vi.fn>).mockImplementation(
     (filePath: string) => {
       if (filePath.includes("manifest")) return Promise.resolve(makeManifest());
-      if (filePath.includes("irs-revocation")) return Promise.resolve(csvContent);
+      if (filePath.includes("irs-revocation"))
+        return Promise.resolve(csvContent);
       return Promise.resolve("");
     },
   );
@@ -141,7 +145,8 @@ function setupOfacDisk(sdnCsv: string, altCsv: string) {
       if (filePath.includes("manifest")) return Promise.resolve(makeManifest());
       if (filePath.includes("sdn.csv")) return Promise.resolve(sdnCsv);
       if (filePath.includes("alt.csv")) return Promise.resolve(altCsv);
-      if (filePath.includes("irs-revocation")) return Promise.resolve(makeIrsCsv(500_000));
+      if (filePath.includes("irs-revocation"))
+        return Promise.resolve(makeIrsCsv(500_000));
       return Promise.resolve("");
     },
   );
@@ -184,8 +189,10 @@ describe("CsvDataStore", () => {
     });
 
     it("skips malformed rows (< 11 fields)", async () => {
-      const header = "EIN|Name|DBA|City|State|Zip|Country|Type|RevDate|PostDate|ReinDate";
-      const good = "123456789|GOOD ORG|DBA|CITY|CA|90001|US|03|2022-01-01|2022-02-01|";
+      const header =
+        "EIN|Name|DBA|City|State|Zip|Country|Type|RevDate|PostDate|ReinDate";
+      const good =
+        "123456789|GOOD ORG|DBA|CITY|CA|90001|US|03|2022-01-01|2022-02-01|";
       const bad = "987654321|BAD ROW|too few fields";
       const csv = [header, good, bad].join("\n");
 
@@ -201,10 +208,14 @@ describe("CsvDataStore", () => {
     });
 
     it("skips rows with invalid EIN format", async () => {
-      const header = "EIN|Name|DBA|City|State|Zip|Country|Type|RevDate|PostDate|ReinDate";
-      const valid = "123456789|VALID ORG|DBA|CITY|CA|90001|US|03|2022-01-01|2022-02-01|";
-      const letters = "ABC123456|LETTER ORG|DBA|CITY|CA|90001|US|03|2022-01-01|2022-02-01|";
-      const short = "12345|SHORT ORG|DBA|CITY|CA|90001|US|03|2022-01-01|2022-02-01|";
+      const header =
+        "EIN|Name|DBA|City|State|Zip|Country|Type|RevDate|PostDate|ReinDate";
+      const valid =
+        "123456789|VALID ORG|DBA|CITY|CA|90001|US|03|2022-01-01|2022-02-01|";
+      const letters =
+        "ABC123456|LETTER ORG|DBA|CITY|CA|90001|US|03|2022-01-01|2022-02-01|";
+      const short =
+        "12345|SHORT ORG|DBA|CITY|CA|90001|US|03|2022-01-01|2022-02-01|";
       const csv = [header, valid, letters, short].join("\n");
 
       setupIrsDisk(csv);
@@ -264,12 +275,8 @@ describe("CsvDataStore", () => {
     });
 
     it("lookupName finds by alias", async () => {
-      const sdn = makeOfacSdnCsv([
-        { entNum: "100", name: "PRIMARY NAME INC" },
-      ]);
-      const alt = makeOfacAltCsv([
-        { entNum: "100", altName: "ALIAS NAME" },
-      ]);
+      const sdn = makeOfacSdnCsv([{ entNum: "100", name: "PRIMARY NAME INC" }]);
+      const alt = makeOfacAltCsv([{ entNum: "100", altName: "ALIAS NAME" }]);
 
       setupOfacDisk(sdn, alt);
       const store = new CsvDataStore(makeConfig());
@@ -281,9 +288,7 @@ describe("CsvDataStore", () => {
     });
 
     it("lookupName returns empty array for unknown name", async () => {
-      const sdn = makeOfacSdnCsv([
-        { entNum: "100", name: "KNOWN ENTITY" },
-      ]);
+      const sdn = makeOfacSdnCsv([{ entNum: "100", name: "KNOWN ENTITY" }]);
       setupOfacDisk(sdn, makeOfacAltCsv([]));
       const store = new CsvDataStore(makeConfig());
       await store.initialize();
@@ -292,9 +297,7 @@ describe("CsvDataStore", () => {
     });
 
     it("deduplicates alias matches for same entNum", async () => {
-      const sdn = makeOfacSdnCsv([
-        { entNum: "100", name: "MAIN ORG" },
-      ]);
+      const sdn = makeOfacSdnCsv([{ entNum: "100", name: "MAIN ORG" }]);
       const alt = makeOfacAltCsv([
         { entNum: "100", altName: "MAIN ORG" }, // same as primary after normalization
       ]);
@@ -309,7 +312,8 @@ describe("CsvDataStore", () => {
     });
 
     it("skips SDN rows with fewer than 6 fields", async () => {
-      const sdn = '"100","SHORT ROW","Entity"\n"200","VALID ENTITY","Entity","SDGT","title","remarks"';
+      const sdn =
+        '"100","SHORT ROW","Entity"\n"200","VALID ENTITY","Entity","SDGT","title","remarks"';
       setupOfacDisk(sdn, makeOfacAltCsv([]));
       const store = new CsvDataStore(makeConfig());
       await store.initialize();
@@ -427,10 +431,13 @@ describe("CsvDataStore", () => {
       // Override IRS readFile too
       (fsp.readFile as ReturnType<typeof vi.fn>).mockImplementation(
         (filePath: string) => {
-          if (filePath.includes("manifest")) return Promise.resolve(makeManifest());
-          if (filePath.includes("irs-revocation")) return Promise.resolve(irsCsv);
+          if (filePath.includes("manifest"))
+            return Promise.resolve(makeManifest());
+          if (filePath.includes("irs-revocation"))
+            return Promise.resolve(irsCsv);
           if (filePath.includes("sdn.csv")) return Promise.resolve(sdn);
-          if (filePath.includes("alt.csv")) return Promise.resolve(makeOfacAltCsv([]));
+          if (filePath.includes("alt.csv"))
+            return Promise.resolve(makeOfacAltCsv([]));
           return Promise.resolve("");
         },
       );
@@ -454,32 +461,39 @@ describe("CsvDataStore", () => {
       );
       (fsp.readFile as ReturnType<typeof vi.fn>).mockImplementation(
         (filePath: string) => {
-          if (filePath.includes("manifest")) return Promise.resolve(makeManifest());
-          if (filePath.includes("irs-revocation")) return Promise.resolve(irsCsv);
+          if (filePath.includes("manifest"))
+            return Promise.resolve(makeManifest());
+          if (filePath.includes("irs-revocation"))
+            return Promise.resolve(irsCsv);
           if (filePath.includes("sdn.csv"))
-            return Promise.resolve(makeOfacSdnCsv([{ entNum: "1", name: "X" }]));
-          if (filePath.includes("alt.csv")) return Promise.resolve(makeOfacAltCsv([]));
+            return Promise.resolve(
+              makeOfacSdnCsv([{ entNum: "1", name: "X" }]),
+            );
+          if (filePath.includes("alt.csv"))
+            return Promise.resolve(makeOfacAltCsv([]));
           return Promise.resolve("");
         },
       );
 
       // Mock axios for the refresh download
-      (axios.get as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-        if (url.includes("irs.gov"))
-          return Promise.resolve({ data: Buffer.from("zip") });
-        if (url.includes("sdn.csv"))
-          return Promise.resolve({
-            data: makeOfacSdnCsv(
-              Array.from({ length: 5000 }, (_, i) => ({
-                entNum: String(i),
-                name: `E${i}`,
-              })),
-            ),
-          });
-        if (url.includes("alt.csv"))
-          return Promise.resolve({ data: makeOfacAltCsv([]) });
-        return Promise.reject(new Error("Unknown"));
-      });
+      (axios.get as ReturnType<typeof vi.fn>).mockImplementation(
+        (url: string) => {
+          if (url.includes("irs.gov"))
+            return Promise.resolve({ data: Buffer.from("zip") });
+          if (url.includes("sdn.csv"))
+            return Promise.resolve({
+              data: makeOfacSdnCsv(
+                Array.from({ length: 5000 }, (_, i) => ({
+                  entNum: String(i),
+                  name: `E${i}`,
+                })),
+              ),
+            });
+          if (url.includes("alt.csv"))
+            return Promise.resolve({ data: makeOfacAltCsv([]) });
+          return Promise.reject(new Error("Unknown"));
+        },
+      );
       (unzipper.Open.file as ReturnType<typeof vi.fn>).mockResolvedValue({
         files: [
           {
@@ -511,11 +525,16 @@ describe("CsvDataStore", () => {
       );
       (fsp.readFile as ReturnType<typeof vi.fn>).mockImplementation(
         (filePath: string) => {
-          if (filePath.includes("manifest")) return Promise.resolve(makeManifest());
-          if (filePath.includes("irs-revocation")) return Promise.resolve(irsCsv);
+          if (filePath.includes("manifest"))
+            return Promise.resolve(makeManifest());
+          if (filePath.includes("irs-revocation"))
+            return Promise.resolve(irsCsv);
           if (filePath.includes("sdn.csv"))
-            return Promise.resolve(makeOfacSdnCsv([{ entNum: "1", name: "X" }]));
-          if (filePath.includes("alt.csv")) return Promise.resolve(makeOfacAltCsv([]));
+            return Promise.resolve(
+              makeOfacSdnCsv([{ entNum: "1", name: "X" }]),
+            );
+          if (filePath.includes("alt.csv"))
+            return Promise.resolve(makeOfacAltCsv([]));
           return Promise.resolve("");
         },
       );
@@ -566,7 +585,8 @@ describe("CsvDataStore", () => {
             // Subsequent: fresh
             return Promise.resolve(makeManifest());
           }
-          if (filePath.includes("irs-revocation")) return Promise.resolve(irsCsv);
+          if (filePath.includes("irs-revocation"))
+            return Promise.resolve(irsCsv);
           if (filePath.includes("sdn.csv"))
             return Promise.resolve(
               makeOfacSdnCsv(
@@ -576,7 +596,8 @@ describe("CsvDataStore", () => {
                 })),
               ),
             );
-          if (filePath.includes("alt.csv")) return Promise.resolve(makeOfacAltCsv([]));
+          if (filePath.includes("alt.csv"))
+            return Promise.resolve(makeOfacAltCsv([]));
           return Promise.resolve("");
         },
       );

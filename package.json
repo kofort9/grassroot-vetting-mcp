@@ -14,6 +14,7 @@
     "url": "https://github.com/kofort9/nonprofit-vetting-mcp/issues"
   },
   "scripts": {
+    "prepare": "git config core.hooksPath scripts/",
     "build": "tsc",
     "dev": "tsc --watch",
     "lint": "eslint src",
@@ -47,15 +48,15 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.23.0",
     "axios": "^1.13.2",
-    "better-sqlite3": "^11.10.0",
     "csv-parse": "^6.1.0",
     "dotenv": "^17.2.3",
+    "sql.js": "^1.13.0",
     "unzipper": "^0.12.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.0.0",
+    "@types/sql.js": "^1.4.9",
     "@types/unzipper": "^0.10.11",
     "@typescript-eslint/eslint-plugin": "^8.47.0",
     "@typescript-eslint/parser": "^8.47.0",

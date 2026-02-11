@@ -1,7 +1,7 @@
-import Database from "better-sqlite3";
 import path from "path";
 import { Tier1Result } from "../domain/nonprofit/types.js";
 import { logInfo, logWarn } from "../core/logging.js";
+import { SqliteDatabase } from "./sqlite-adapter.js";
 
 export interface VettedRecord {
   id: number;
@@ -35,7 +35,7 @@ const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 
 export class VettingStore {
-  private db: Database.Database | null = null;
+  private db: SqliteDatabase | null = null;
   private dataDir: string;
 
   constructor(dataDir: string) {
@@ -44,12 +44,12 @@ export class VettingStore {
 
   initialize(): void {
     const dbPath = path.join(this.dataDir, DB_FILENAME);
-    this.db = new Database(dbPath);
+    this.db = SqliteDatabase.open(dbPath);
 
-    // Enable WAL mode for better read concurrency (future-proofing)
+    // WAL pragma is silently ignored by sql.js (in-memory), kept for documentation
     this.db.pragma("journal_mode = WAL");
 
-    this.db.exec(`
+    this.db.sqlExec(`
       CREATE TABLE IF NOT EXISTS vetting_results (
         id             INTEGER PRIMARY KEY AUTOINCREMENT,
         ein            TEXT NOT NULL,
@@ -69,6 +69,7 @@ export class VettingStore {
       CREATE INDEX IF NOT EXISTS idx_vetting_vetted_at ON vetting_results(vetted_at);
     `);
 
+    this.db.persist();
     logInfo("VettingStore initialized");
   }
 
@@ -97,7 +98,9 @@ export class VettingStore {
 
     const row = this.db!.prepare(
       "SELECT * FROM vetting_results WHERE id = ?",
-    ).get(info.lastInsertRowid) as RawVettedRow;
+    ).get(info.lastInsertRowid) as unknown as RawVettedRow;
+
+    this.db!.persist();
 
     return this.mapRow(row);
   }
@@ -108,7 +111,7 @@ export class VettingStore {
     const normalized = ein.replace(/[-\s]/g, "");
     const row = this.db!.prepare(
       "SELECT * FROM vetting_results WHERE ein = ? ORDER BY vetted_at DESC, id DESC LIMIT 1",
-    ).get(normalized) as RawVettedRow | undefined;
+    ).get(normalized) as unknown as RawVettedRow | undefined;
 
     return row ? this.mapRow(row) : null;
   }
@@ -143,7 +146,7 @@ export class VettingStore {
 
     const rows = this.db!.prepare(
       `SELECT * FROM vetting_results ${where} ORDER BY vetted_at DESC, id DESC LIMIT ?`,
-    ).all(...params, limit) as RawVettedRow[];
+    ).all(...params, limit) as unknown as RawVettedRow[];
 
     return rows.map((row) => this.mapRow(row));
   }
@@ -160,7 +163,12 @@ export class VettingStore {
         SUM(CASE WHEN recommendation = 'REJECT' THEN 1 ELSE 0 END) as reject
       FROM vetting_results
     `,
-    ).get() as { total: number; pass: number; review: number; reject: number };
+    ).get() as unknown as {
+      total: number;
+      pass: number;
+      review: number;
+      reject: number;
+    };
 
     return {
       total: row.total,

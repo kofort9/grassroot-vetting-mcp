@@ -60,7 +60,9 @@ describe("Gate 4: checkPortfolioFit", () => {
   // ---- Outside allowed categories ----
 
   it("returns FAIL for org outside allowed categories", () => {
-    const config = makePortfolioFitConfig({ allowedNteeCategories: ["A", "B"] });
+    const config = makePortfolioFitConfig({
+      allowedNteeCategories: ["A", "B"],
+    });
     const profile = makeProfile({ ntee_code: "Z99" });
     const result = checkPortfolioFit(profile, config);
     expect(result.verdict).toBe("FAIL");

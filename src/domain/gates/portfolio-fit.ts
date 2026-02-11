@@ -1,5 +1,9 @@
-import type { NonprofitProfile, PortfolioFitConfig } from "../nonprofit/types.js";
+import type {
+  NonprofitProfile,
+  PortfolioFitConfig,
+} from "../nonprofit/types.js";
 import type { GateCheckResult, GateSubCheck } from "./gate-types.js";
+import { normalizeEin, matchesNteeCategory } from "./portfolio-fit-utils.js";
 
 /**
  * Gate 4: Portfolio Fit
@@ -19,11 +23,10 @@ export function checkPortfolioFit(
   config: PortfolioFitConfig,
 ): GateCheckResult {
   const subChecks: GateSubCheck[] = [];
-  const normalize = (ein: string) => ein.replace(/[-\s]/g, "");
-  const normalizedEin = normalize(profile.ein);
+  const normalizedEin = normalizeEin(profile.ein);
 
   // Sub-check A: EIN exclusion list
-  const excludedSet = new Set(config.excludedEins.map(normalize));
+  const excludedSet = new Set(config.excludedEins.map(normalizeEin));
   const isExcluded = excludedSet.has(normalizedEin);
   subChecks.push({
     label: "EIN exclusion list",
@@ -34,11 +37,11 @@ export function checkPortfolioFit(
   });
 
   // Sub-check B: EIN inclusion list
-  const includedSet = new Set(config.includedEins.map(normalize));
+  const includedSet = new Set(config.includedEins.map(normalizeEin));
   const isIncluded = includedSet.has(normalizedEin);
   subChecks.push({
     label: "EIN inclusion list",
-    passed: true, // Inclusion list doesn't "fail" — it's an override
+    passed: true,
     detail: isIncluded
       ? "Included by platform override"
       : "Not on inclusion list (standard NTEE check applies)",
@@ -46,16 +49,9 @@ export function checkPortfolioFit(
 
   // Sub-check C: NTEE category match
   const nteeCode = (profile.ntee_code || "").toUpperCase();
-  let nteeMatched = false;
-
-  if (nteeCode) {
-    for (const prefix of config.allowedNteeCategories) {
-      if (prefix && nteeCode.startsWith(prefix.toUpperCase())) {
-        nteeMatched = true;
-        break;
-      }
-    }
-  }
+  const nteeMatched = nteeCode
+    ? matchesNteeCategory(nteeCode, config.allowedNteeCategories)
+    : false;
 
   subChecks.push({
     label: "NTEE category match",

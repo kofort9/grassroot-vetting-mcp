@@ -12,11 +12,15 @@ import { IrsRevocationClient } from "../domain/red-flags/irs-revocation-client.j
 import { OfacSdnClient } from "../domain/red-flags/ofac-sdn-client.js";
 import { CourtListenerClient } from "../domain/red-flags/courtlistener-client.js";
 import * as tools from "../domain/nonprofit/tools.js";
+import { DiscoveryIndex } from "../data-sources/discovery-index.js";
+import { DiscoveryPipeline } from "../domain/discovery/pipeline.js";
+import * as discoveryTools from "../domain/discovery/tools.js";
 import { logInfo, logError } from "../core/logging.js";
+import { ensureSqlJs } from "../data-sources/sqlite-adapter.js";
 
 // Server configuration
 const SERVER_NAME = "nonprofit-vetting-mcp";
-const SERVER_VERSION = "1.1.0";
+const SERVER_VERSION = "1.2.0";
 
 // Load configuration and initialize clients
 const config = loadConfig();
@@ -36,6 +40,11 @@ const courtClient = config.redFlag.courtlistenerApiToken
 // Vetting result persistence (SQLite, same dataDir as IRS/OFAC caches)
 const vettingStore = new VettingStore(config.redFlag.dataDir);
 let vettingStoreReady = false;
+
+// Discovery pipeline (BMF index for browsing nonprofits)
+const discoveryIndex = new DiscoveryIndex(config.discovery);
+const discoveryPipeline = new DiscoveryPipeline(discoveryIndex, portfolioFit);
+let discoveryReady = false;
 
 // Create MCP server instance
 const server = new Server(
@@ -172,6 +181,74 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
         },
       },
+      {
+        name: "discover_nonprofits",
+        description:
+          "Browse and filter nonprofits from IRS Business Master File (~1.8M orgs). Zero API calls, sub-second response. Filter by state, city, NTEE category, ruling year, or name. Returns candidates ready for check_tier1 vetting. Default: 501(c)(3) orgs within platform portfolio scope.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            state: {
+              type: "string",
+              description: 'Filter by state (2-letter code, e.g., "CA", "NY").',
+            },
+            city: {
+              type: "string",
+              description: "Filter by city name (case-insensitive).",
+            },
+            ntee_categories: {
+              type: "array",
+              items: { type: "string" },
+              description:
+                'NTEE category prefixes to include (e.g., ["B"] for education, ["E"] for health). Intersected with platform portfolio scope.',
+            },
+            ntee_exclude: {
+              type: "array",
+              items: { type: "string" },
+              description: "NTEE category prefixes to exclude.",
+            },
+            subsection: {
+              type: "number",
+              description:
+                "IRS subsection code. Default: 3 (501(c)(3)). Use 0 for all.",
+            },
+            min_ruling_year: {
+              type: "number",
+              description: "Minimum ruling year (e.g., 2010).",
+            },
+            max_ruling_year: {
+              type: "number",
+              description: "Maximum ruling year (e.g., 2020).",
+            },
+            name_contains: {
+              type: "string",
+              description: "Substring match on organization name.",
+            },
+            portfolio_fit_only: {
+              type: "boolean",
+              description:
+                "Apply platform portfolio-fit NTEE filter. Default: true.",
+            },
+            limit: {
+              type: "number",
+              description: "Max results to return (default 100, max 500).",
+            },
+            offset: {
+              type: "number",
+              description: "Pagination offset (default 0).",
+            },
+          },
+        },
+      },
+      {
+        name: "refresh_discovery_index",
+        description:
+          "Re-download IRS BMF data and rebuild the discovery index. Takes ~3-5 minutes. Use when the index is stale or on first setup.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
     ],
   };
 });
@@ -214,6 +291,23 @@ function argNumber(
 ): number | undefined {
   const val = args?.[key];
   return typeof val === "number" ? val : undefined;
+}
+
+function argBoolOpt(
+  args: Record<string, unknown> | undefined,
+  key: string,
+): boolean | undefined {
+  const val = args?.[key];
+  return typeof val === "boolean" ? val : undefined;
+}
+
+function argStringArray(
+  args: Record<string, unknown> | undefined,
+  key: string,
+): string[] | undefined {
+  const val = args?.[key];
+  if (!Array.isArray(val)) return undefined;
+  return val.filter((v): v is string => typeof v === "string");
 }
 
 // Handle call_tool request
@@ -359,6 +453,41 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       });
     }
 
+    if (name === "discover_nonprofits") {
+      if (!discoveryReady) {
+        return formatToolResponse({
+          success: false,
+          error:
+            "Discovery index not ready. Run refresh_discovery_index to build it, or check server logs.",
+          attribution: "",
+        });
+      }
+      return formatToolResponse(
+        discoveryTools.discoverNonprofits(discoveryPipeline, {
+          state: argStringOpt(args, "state"),
+          city: argStringOpt(args, "city"),
+          ntee_categories: argStringArray(args, "ntee_categories"),
+          ntee_exclude: argStringArray(args, "ntee_exclude"),
+          subsection: argNumber(args, "subsection"),
+          min_ruling_year: argNumber(args, "min_ruling_year"),
+          max_ruling_year: argNumber(args, "max_ruling_year"),
+          name_contains: argStringOpt(args, "name_contains"),
+          portfolio_fit_only: argBoolOpt(args, "portfolio_fit_only"),
+          limit: argNumber(args, "limit"),
+          offset: argNumber(args, "offset"),
+        }),
+      );
+    }
+
+    if (name === "refresh_discovery_index") {
+      const refreshResult =
+        await discoveryTools.refreshDiscoveryIndex(discoveryIndex);
+      if (refreshResult.success) {
+        discoveryReady = true;
+      }
+      return formatToolResponse(refreshResult);
+    }
+
     throw new Error(`Unknown tool: ${name}`);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -371,6 +500,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // Start server
 export async function startServer(): Promise<void> {
+  // Initialize sql.js WASM (must happen before any SQLite operations)
+  await ensureSqlJs();
+
   // Initialize data stores (downloads IRS/OFAC data on first run or when stale)
   try {
     await dataStore.initialize();
@@ -393,6 +525,27 @@ export async function startServer(): Promise<void> {
     );
   }
 
+  // Initialize discovery index (schema only — does not download data)
+  try {
+    discoveryIndex.initialize();
+    discoveryReady = discoveryIndex.isReady();
+    if (discoveryReady) {
+      const stats = discoveryIndex.getStats();
+      logInfo(
+        `Discovery index ready: ${stats.totalOrgs} orgs (updated ${stats.lastUpdated})`,
+      );
+    } else {
+      logInfo(
+        "Discovery index not populated. Run refresh_discovery_index to build it.",
+      );
+    }
+  } catch (err) {
+    logError(
+      "DiscoveryIndex initialization failed:",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
   logInfo(`${SERVER_NAME} v${SERVER_VERSION} running on stdio`);
@@ -401,12 +554,14 @@ export async function startServer(): Promise<void> {
 // Graceful shutdown
 process.on("SIGINT", () => {
   logInfo("Received SIGINT, shutting down...");
+  discoveryIndex.close();
   vettingStore.close();
   process.exit(0);
 });
 
 process.on("SIGTERM", () => {
   logInfo("Received SIGTERM, shutting down...");
+  discoveryIndex.close();
   vettingStore.close();
   process.exit(0);
 });

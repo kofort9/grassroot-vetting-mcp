@@ -1,4 +1,7 @@
-import type { NonprofitProfile, PortfolioFitConfig } from "../nonprofit/types.js";
+import type {
+  NonprofitProfile,
+  PortfolioFitConfig,
+} from "../nonprofit/types.js";
 import type { IrsRevocationClient } from "../red-flags/irs-revocation-client.js";
 import type { OfacSdnClient } from "../red-flags/ofac-sdn-client.js";
 import type { GateLayerResult } from "./gate-types.js";
