@@ -128,7 +128,7 @@ export class VettingStore {
     }
 
     if (options?.since) {
-      if (!/^\d{4}-\d{2}-\d{2}/.test(options.since)) {
+      if (!/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?)?$/.test(options.since)) {
         throw new Error(
           `Invalid since date format: "${options.since}". Expected ISO 8601 (e.g., "2026-01-01").`,
         );
@@ -189,6 +189,15 @@ export class VettingStore {
       }
       this.db = null;
     }
+  }
+
+  /**
+   * Returns the underlying SqliteDatabase instance (for shared table access).
+   * Throws if not initialized.
+   */
+  getDatabase(): SqliteDatabase {
+    this.ensureOpen();
+    return this.db!;
   }
 
   private ensureOpen(): void {
