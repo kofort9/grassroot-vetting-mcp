@@ -1,5 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import Database from "better-sqlite3";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -7,6 +6,10 @@ import { DiscoveryPipeline } from "../src/domain/discovery/pipeline.js";
 import { DiscoveryIndex } from "../src/data-sources/discovery-index.js";
 import type { PortfolioFitConfig } from "../src/domain/nonprofit/types.js";
 import type { DiscoveryIndexConfig } from "../src/domain/discovery/types.js";
+import {
+  ensureSqlJs,
+  SqliteDatabase,
+} from "../src/data-sources/sqlite-adapter.js";
 
 const TEST_ORGS = [
   {
@@ -124,8 +127,8 @@ let tmpDir: string;
 let index: DiscoveryIndex;
 let pipeline: DiscoveryPipeline;
 
-function seedDatabase(db: Database.Database): void {
-  db.exec(`
+function seedDatabase(db: SqliteDatabase): void {
+  db.sqlExec(`
     CREATE TABLE IF NOT EXISTS bmf_orgs (
       ein TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -157,13 +160,16 @@ function seedDatabase(db: Database.Database): void {
   }
 }
 
+beforeAll(async () => {
+  await ensureSqlJs();
+});
+
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "discovery-pipeline-"));
 
   // Create and seed the DB directly (bypassing buildIndex which needs network)
   const dbPath = path.join(tmpDir, "discovery-index.db");
-  const db = new Database(dbPath);
-  db.pragma("journal_mode = WAL");
+  const db = SqliteDatabase.open(dbPath);
   seedDatabase(db);
   db.close();
 

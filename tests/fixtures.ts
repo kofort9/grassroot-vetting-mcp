@@ -25,7 +25,9 @@ export const DEFAULT_THRESHOLDS: VettingThresholds = loadThresholds();
  * Build thresholds with specific overrides (defaults are valid).
  * Moved here so config.test.ts and scoring.test.ts can share it.
  */
-export function makeThresholds(overrides: Partial<VettingThresholds>): VettingThresholds {
+export function makeThresholds(
+  overrides: Partial<VettingThresholds>,
+): VettingThresholds {
   return { ...DEFAULT_THRESHOLDS, ...overrides };
 }
 
@@ -54,11 +56,13 @@ function recentTaxPrd(): number {
 /**
  * Build a healthy 990 summary. Override any fields as needed.
  */
-export function make990(overrides?: Partial<Latest990Summary>): Latest990Summary {
+export function make990(
+  overrides?: Partial<Latest990Summary>,
+): Latest990Summary {
   return {
     tax_period: recentTaxPeriod(),
     tax_year: new Date().getFullYear() - 1,
-    form_type: '990',
+    form_type: "990",
     total_revenue: 500_000,
     total_expenses: 400_000,
     total_assets: 1_000_000,
@@ -73,15 +77,17 @@ export function make990(overrides?: Partial<Latest990Summary>): Latest990Summary
  * Build a healthy nonprofit profile that passes all Tier 1 checks.
  * Override any fields to create specific test scenarios.
  */
-export function makeProfile(overrides?: Partial<NonprofitProfile>): NonprofitProfile {
+export function makeProfile(
+  overrides?: Partial<NonprofitProfile>,
+): NonprofitProfile {
   return {
-    ein: '95-3135649',
-    name: 'Test Nonprofit',
-    address: { city: 'Los Angeles', state: 'CA' },
-    ruling_date: '2010-01-01',
+    ein: "95-3135649",
+    name: "Test Nonprofit",
+    address: { city: "Los Angeles", state: "CA" },
+    ruling_date: "2010-01-01",
     years_operating: 15,
-    subsection: '03',
-    ntee_code: 'K31',
+    subsection: "03",
+    ntee_code: "K31",
     latest_990: make990(),
     filing_count: 5,
     ...overrides,
@@ -176,7 +182,8 @@ export function makeCleanOfacResult(): OfacSanctionsResult {
 export function makeMatchedOfacResult(): OfacSanctionsResult {
   return {
     found: true,
-    detail: 'OFAC SDN MATCH — 1 sanctioned entity/entities found matching "Bad Actor Foundation"',
+    detail:
+      'OFAC SDN MATCH — 1 sanctioned entity/entities found matching "Bad Actor Foundation"',
     matches: [
       {
         entNum: "12345",
@@ -282,9 +289,7 @@ export function makePortfolioFitConfig(
 // Tier 1 Result Factory (for VettingStore tests)
 // ============================================================================
 
-export function makeTier1Result(
-  overrides?: Partial<Tier1Result>,
-): Tier1Result {
+export function makeTier1Result(overrides?: Partial<Tier1Result>): Tier1Result {
   return {
     ein: "95-3135649",
     name: "Test Nonprofit",

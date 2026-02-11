@@ -1,4 +1,3 @@
-import Database from "better-sqlite3";
 import fs from "fs";
 import fsp from "fs/promises";
 import path from "path";
@@ -18,6 +17,7 @@ import {
   logError,
   getErrorMessage,
 } from "../core/logging.js";
+import { SqliteDatabase } from "./sqlite-adapter.js";
 
 const DB_FILENAME = "discovery-index.db";
 const MANIFEST_FILENAME = "discovery-manifest.json";
@@ -32,7 +32,7 @@ const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
 
 export class DiscoveryIndex {
-  private db: Database.Database | null = null;
+  private db: SqliteDatabase | null = null;
   private config: DiscoveryIndexConfig;
   private lastBuildAt = 0;
 
@@ -43,10 +43,10 @@ export class DiscoveryIndex {
   /** Initialize DB schema. Does NOT download data -- call buildIndex() for that. */
   initialize(): void {
     const dbPath = path.join(this.config.dataDir, DB_FILENAME);
-    this.db = new Database(dbPath);
+    this.db = SqliteDatabase.open(dbPath);
     this.db.pragma("journal_mode = WAL");
 
-    this.db.exec(`
+    this.db.sqlExec(`
       CREATE TABLE IF NOT EXISTS bmf_orgs (
         ein        TEXT PRIMARY KEY,
         name       TEXT NOT NULL,
@@ -63,6 +63,7 @@ export class DiscoveryIndex {
       CREATE INDEX IF NOT EXISTS idx_bmf_state_ntee ON bmf_orgs(state, ntee_code);
     `);
 
+    this.db.persist();
     logInfo("DiscoveryIndex initialized");
   }
 
@@ -111,7 +112,7 @@ export class DiscoveryIndex {
         });
 
         const rows = await this.parseBmfStream(response.data);
-        allRows.push(...rows);
+        for (const row of rows) allRows.push(row);
         logInfo(`Parsed ${rows.length} rows from ${region}`);
       } catch (error) {
         const msg = getErrorMessage(error);
@@ -127,8 +128,8 @@ export class DiscoveryIndex {
     }
 
     // Rebuild table from scratch inside a transaction
-    this.db!.exec("DROP TABLE IF EXISTS bmf_orgs");
-    this.db!.exec(`
+    this.db!.sqlExec("DROP TABLE IF EXISTS bmf_orgs");
+    this.db!.sqlExec(`
       CREATE TABLE bmf_orgs (
         ein        TEXT PRIMARY KEY,
         name       TEXT NOT NULL,
@@ -138,29 +139,26 @@ export class DiscoveryIndex {
         subsection INTEGER NOT NULL DEFAULT 0,
         ruling_date TEXT NOT NULL DEFAULT ''
       );
-      CREATE INDEX idx_bmf_state ON bmf_orgs(state);
-      CREATE INDEX idx_bmf_ntee ON bmf_orgs(ntee_code);
-      CREATE INDEX idx_bmf_subsection ON bmf_orgs(subsection);
-      CREATE INDEX idx_bmf_state_ntee ON bmf_orgs(state, ntee_code);
     `);
 
-    const insertStmt = this.db!.prepare(`
+    const INSERT_SQL = `
       INSERT OR REPLACE INTO bmf_orgs (ein, name, city, state, ntee_code, subsection, ruling_date)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
+    `;
 
     const insertBatch = this.db!.transaction((rows: BmfRow[]) => {
-      for (const row of rows) {
-        insertStmt.run(
-          row.ein,
-          row.name,
-          row.city,
-          row.state,
-          row.ntee_code,
-          row.subsection,
-          row.ruling_date,
-        );
-      }
+      this.db!.runBulk(
+        INSERT_SQL,
+        rows.map((r) => [
+          r.ein,
+          r.name,
+          r.city,
+          r.state,
+          r.ntee_code,
+          r.subsection,
+          r.ruling_date,
+        ]),
+      );
     });
 
     // Insert in batches
@@ -169,9 +167,21 @@ export class DiscoveryIndex {
       insertBatch(batch);
     }
 
+    // Create indexes after bulk insert (avoids maintaining B-trees during inserts)
+    this.db!.sqlExec(`
+      CREATE INDEX idx_bmf_state ON bmf_orgs(state);
+      CREATE INDEX idx_bmf_ntee ON bmf_orgs(ntee_code);
+      CREATE INDEX idx_bmf_subsection ON bmf_orgs(subsection);
+      CREATE INDEX idx_bmf_state_ntee ON bmf_orgs(state, ntee_code);
+    `);
+
+    this.db!.persist();
+
     const duration = Date.now() - start;
     const rowCount = (
-      this.db!.prepare("SELECT COUNT(*) as count FROM bmf_orgs").get() as {
+      this.db!.prepare(
+        "SELECT COUNT(*) as count FROM bmf_orgs",
+      ).get() as unknown as {
         count: number;
       }
     ).count;
@@ -270,7 +280,7 @@ export class DiscoveryIndex {
     // Count total matching rows
     const countRow = this.db!.prepare(
       `SELECT COUNT(*) as total FROM bmf_orgs ${where}`,
-    ).get(...params) as { total: number };
+    ).get(...params) as unknown as { total: number };
 
     // Apply pagination
     const limit = Math.max(
@@ -287,7 +297,7 @@ export class DiscoveryIndex {
        FROM bmf_orgs ${where}
        ORDER BY name
        LIMIT ? OFFSET ?`,
-    ).all(...params, limit, offset) as DiscoveryCandidate[];
+    ).all(...params, limit, offset) as unknown as DiscoveryCandidate[];
 
     const stats = this.getStats();
 
@@ -308,7 +318,7 @@ export class DiscoveryIndex {
 
     const row = this.db!.prepare(
       "SELECT COUNT(*) as total FROM bmf_orgs",
-    ).get() as { total: number };
+    ).get() as unknown as { total: number };
 
     const manifest = this.loadManifestSync();
     return {

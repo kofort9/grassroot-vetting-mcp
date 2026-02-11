@@ -1,10 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import Database from "better-sqlite3";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
 import { DiscoveryIndex } from "../src/data-sources/discovery-index.js";
 import type { DiscoveryIndexConfig } from "../src/domain/discovery/types.js";
+import {
+  ensureSqlJs,
+  SqliteDatabase,
+} from "../src/data-sources/sqlite-adapter.js";
 
 const TEST_ORGS = [
   {
@@ -69,10 +72,9 @@ function makeConfig(dataDir: string): DiscoveryIndexConfig {
 
 function seedTestData(dataDir: string): void {
   const dbPath = path.join(dataDir, "discovery-index.db");
-  const db = new Database(dbPath);
-  db.pragma("journal_mode = WAL");
+  const db = SqliteDatabase.open(dbPath);
 
-  db.exec(`
+  db.sqlExec(`
     CREATE TABLE IF NOT EXISTS bmf_orgs (
       ein        TEXT PRIMARY KEY,
       name       TEXT NOT NULL,
@@ -93,27 +95,28 @@ function seedTestData(dataDir: string): void {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
 
-  const insertAll = db.transaction(() => {
-    for (const org of TEST_ORGS) {
-      stmt.run(
-        org.ein,
-        org.name,
-        org.city,
-        org.state,
-        org.ntee_code,
-        org.subsection,
-        org.ruling_date,
-      );
-    }
-  });
+  for (const org of TEST_ORGS) {
+    stmt.run(
+      org.ein,
+      org.name,
+      org.city,
+      org.state,
+      org.ntee_code,
+      org.subsection,
+      org.ruling_date,
+    );
+  }
 
-  insertAll();
   db.close();
 }
 
 describe("DiscoveryIndex", () => {
   let index: DiscoveryIndex;
   let tmpDir: string;
+
+  beforeAll(async () => {
+    await ensureSqlJs();
+  });
 
   beforeEach(() => {
     tmpDir = makeTempDir();
@@ -136,7 +139,7 @@ describe("DiscoveryIndex", () => {
     expect(fs.existsSync(dbPath)).toBe(true);
 
     // Verify table exists by querying it
-    const db = new Database(dbPath, { readonly: true });
+    const db = SqliteDatabase.open(dbPath);
     const tables = db
       .prepare(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='bmf_orgs'",

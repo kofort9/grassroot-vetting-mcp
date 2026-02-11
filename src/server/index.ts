@@ -16,6 +16,7 @@ import { DiscoveryIndex } from "../data-sources/discovery-index.js";
 import { DiscoveryPipeline } from "../domain/discovery/pipeline.js";
 import * as discoveryTools from "../domain/discovery/tools.js";
 import { logInfo, logError } from "../core/logging.js";
+import { ensureSqlJs } from "../data-sources/sqlite-adapter.js";
 
 // Server configuration
 const SERVER_NAME = "nonprofit-vetting-mcp";
@@ -499,6 +500,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // Start server
 export async function startServer(): Promise<void> {
+  // Initialize sql.js WASM (must happen before any SQLite operations)
+  await ensureSqlJs();
+
   // Initialize data stores (downloads IRS/OFAC data on first run or when stale)
   try {
     await dataStore.initialize();

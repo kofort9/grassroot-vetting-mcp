@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -8,6 +7,10 @@ import { DiscoveryPipeline } from "../src/domain/discovery/pipeline.js";
 import * as discoveryTools from "../src/domain/discovery/tools.js";
 import { loadPortfolioFitConfig } from "../src/core/config.js";
 import type { DiscoveryIndexConfig } from "../src/domain/discovery/types.js";
+import {
+  ensureSqlJs,
+  SqliteDatabase,
+} from "../src/data-sources/sqlite-adapter.js";
 
 /**
  * E2E: Full discovery stack with realistic test data.
@@ -19,26 +22,130 @@ import type { DiscoveryIndexConfig } from "../src/domain/discovery/types.js";
 // Realistic sample across multiple states, NTEE codes, and subsections
 const SEED_ORGS = [
   // California -- education
-  { ein: "941234567", name: "OAKLAND COMMUNITY SCHOOLS", city: "OAKLAND", state: "CA", ntee_code: "B20", subsection: 3, ruling_date: "200305" },
-  { ein: "942345678", name: "SF LITERACY PROJECT", city: "SAN FRANCISCO", state: "CA", ntee_code: "B60", subsection: 3, ruling_date: "201108" },
-  { ein: "943456789", name: "LA STEM ACADEMY", city: "LOS ANGELES", state: "CA", ntee_code: "B28", subsection: 3, ruling_date: "201503" },
+  {
+    ein: "941234567",
+    name: "OAKLAND COMMUNITY SCHOOLS",
+    city: "OAKLAND",
+    state: "CA",
+    ntee_code: "B20",
+    subsection: 3,
+    ruling_date: "200305",
+  },
+  {
+    ein: "942345678",
+    name: "SF LITERACY PROJECT",
+    city: "SAN FRANCISCO",
+    state: "CA",
+    ntee_code: "B60",
+    subsection: 3,
+    ruling_date: "201108",
+  },
+  {
+    ein: "943456789",
+    name: "LA STEM ACADEMY",
+    city: "LOS ANGELES",
+    state: "CA",
+    ntee_code: "B28",
+    subsection: 3,
+    ruling_date: "201503",
+  },
   // California -- arts
-  { ein: "944567890", name: "BAY AREA ARTS COLLECTIVE", city: "SAN FRANCISCO", state: "CA", ntee_code: "A20", subsection: 3, ruling_date: "199901" },
-  { ein: "945678901", name: "OAKLAND MURAL PROJECT", city: "OAKLAND", state: "CA", ntee_code: "A25", subsection: 3, ruling_date: "201007" },
+  {
+    ein: "944567890",
+    name: "BAY AREA ARTS COLLECTIVE",
+    city: "SAN FRANCISCO",
+    state: "CA",
+    ntee_code: "A20",
+    subsection: 3,
+    ruling_date: "199901",
+  },
+  {
+    ein: "945678901",
+    name: "OAKLAND MURAL PROJECT",
+    city: "OAKLAND",
+    state: "CA",
+    ntee_code: "A25",
+    subsection: 3,
+    ruling_date: "201007",
+  },
   // California -- health
-  { ein: "946789012", name: "EAST BAY FREE CLINIC", city: "OAKLAND", state: "CA", ntee_code: "E20", subsection: 3, ruling_date: "200811" },
+  {
+    ein: "946789012",
+    name: "EAST BAY FREE CLINIC",
+    city: "OAKLAND",
+    state: "CA",
+    ntee_code: "E20",
+    subsection: 3,
+    ruling_date: "200811",
+  },
   // California -- outside portfolio scope (religious)
-  { ein: "947890123", name: "CA CHURCH MINISTRIES", city: "SACRAMENTO", state: "CA", ntee_code: "X20", subsection: 3, ruling_date: "198505" },
+  {
+    ein: "947890123",
+    name: "CA CHURCH MINISTRIES",
+    city: "SACRAMENTO",
+    state: "CA",
+    ntee_code: "X20",
+    subsection: 3,
+    ruling_date: "198505",
+  },
   // California -- non-501(c)(3)
-  { ein: "948901234", name: "CA TRADE ASSOCIATION", city: "LOS ANGELES", state: "CA", ntee_code: "S20", subsection: 6, ruling_date: "200101" },
+  {
+    ein: "948901234",
+    name: "CA TRADE ASSOCIATION",
+    city: "LOS ANGELES",
+    state: "CA",
+    ntee_code: "S20",
+    subsection: 6,
+    ruling_date: "200101",
+  },
   // New York
-  { ein: "131234567", name: "NYC YOUTH EDUCATION FUND", city: "NEW YORK", state: "NY", ntee_code: "B20", subsection: 3, ruling_date: "200607" },
-  { ein: "132345678", name: "BROOKLYN ARTS CENTER", city: "BROOKLYN", state: "NY", ntee_code: "A30", subsection: 3, ruling_date: "201201" },
+  {
+    ein: "131234567",
+    name: "NYC YOUTH EDUCATION FUND",
+    city: "NEW YORK",
+    state: "NY",
+    ntee_code: "B20",
+    subsection: 3,
+    ruling_date: "200607",
+  },
+  {
+    ein: "132345678",
+    name: "BROOKLYN ARTS CENTER",
+    city: "BROOKLYN",
+    state: "NY",
+    ntee_code: "A30",
+    subsection: 3,
+    ruling_date: "201201",
+  },
   // Texas
-  { ein: "741234567", name: "AUSTIN ENVIRONMENTAL TRUST", city: "AUSTIN", state: "TX", ntee_code: "C20", subsection: 3, ruling_date: "201404" },
-  { ein: "742345678", name: "HOUSTON FOOD BANK ALLIANCE", city: "HOUSTON", state: "TX", ntee_code: "K30", subsection: 3, ruling_date: "199803" },
+  {
+    ein: "741234567",
+    name: "AUSTIN ENVIRONMENTAL TRUST",
+    city: "AUSTIN",
+    state: "TX",
+    ntee_code: "C20",
+    subsection: 3,
+    ruling_date: "201404",
+  },
+  {
+    ein: "742345678",
+    name: "HOUSTON FOOD BANK ALLIANCE",
+    city: "HOUSTON",
+    state: "TX",
+    ntee_code: "K30",
+    subsection: 3,
+    ruling_date: "199803",
+  },
   // Org with no NTEE code
-  { ein: "951111111", name: "UNCLASSIFIED ORG", city: "RENO", state: "NV", ntee_code: "", subsection: 3, ruling_date: "201001" },
+  {
+    ein: "951111111",
+    name: "UNCLASSIFIED ORG",
+    city: "RENO",
+    state: "NV",
+    ntee_code: "",
+    subsection: 3,
+    ruling_date: "201001",
+  },
 ];
 
 let tmpDir: string;
@@ -47,9 +154,8 @@ let pipeline: DiscoveryPipeline;
 
 function seedDatabase(dir: string): void {
   const dbPath = path.join(dir, "discovery-index.db");
-  const db = new Database(dbPath);
-  db.pragma("journal_mode = WAL");
-  db.exec(`
+  const db = SqliteDatabase.open(dbPath);
+  db.sqlExec(`
     CREATE TABLE bmf_orgs (
       ein TEXT PRIMARY KEY, name TEXT NOT NULL,
       city TEXT NOT NULL DEFAULT '', state TEXT NOT NULL DEFAULT '',
@@ -65,7 +171,15 @@ function seedDatabase(dir: string): void {
     "INSERT INTO bmf_orgs (ein, name, city, state, ntee_code, subsection, ruling_date) VALUES (?, ?, ?, ?, ?, ?, ?)",
   );
   for (const o of SEED_ORGS) {
-    stmt.run(o.ein, o.name, o.city, o.state, o.ntee_code, o.subsection, o.ruling_date);
+    stmt.run(
+      o.ein,
+      o.name,
+      o.city,
+      o.state,
+      o.ntee_code,
+      o.subsection,
+      o.ruling_date,
+    );
   }
   db.close();
 
@@ -82,7 +196,8 @@ function seedDatabase(dir: string): void {
   );
 }
 
-beforeAll(() => {
+beforeAll(async () => {
+  await ensureSqlJs();
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "discovery-e2e-"));
   seedDatabase(tmpDir);
 
@@ -224,7 +339,9 @@ describe("Discovery E2E", () => {
       });
 
       expect(result.data!.candidates).toHaveLength(1);
-      expect(result.data!.candidates[0].name).toBe("HOUSTON FOOD BANK ALLIANCE");
+      expect(result.data!.candidates[0].name).toBe(
+        "HOUSTON FOOD BANK ALLIANCE",
+      );
     });
   });
 
@@ -263,7 +380,9 @@ describe("Discovery E2E", () => {
 
   describe("Response shape matches MCP tool contract", () => {
     it("has success, data, attribution fields", () => {
-      const result = discoveryTools.discoverNonprofits(pipeline, { state: "TX" });
+      const result = discoveryTools.discoverNonprofits(pipeline, {
+        state: "TX",
+      });
 
       expect(result).toHaveProperty("success", true);
       expect(result).toHaveProperty("attribution");

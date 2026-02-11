@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
 import { VettingStore } from "../src/data-sources/vetting-store.js";
 import { makeTier1Result } from "./fixtures.js";
+import { ensureSqlJs } from "../src/data-sources/sqlite-adapter.js";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "vetting-store-test-"));
@@ -12,6 +13,10 @@ function makeTempDir(): string {
 describe("VettingStore", () => {
   let store: VettingStore;
   let tmpDir: string;
+
+  beforeAll(async () => {
+    await ensureSqlJs();
+  });
 
   beforeEach(() => {
     tmpDir = makeTempDir();
@@ -66,8 +71,12 @@ describe("VettingStore", () => {
     const ein = "95-3135649";
 
     // Save two results for the same EIN
-    store.saveResult(makeTier1Result({ ein, score: 70, recommendation: "REVIEW" }));
-    store.saveResult(makeTier1Result({ ein, score: 90, recommendation: "PASS" }));
+    store.saveResult(
+      makeTier1Result({ ein, score: 70, recommendation: "REVIEW" }),
+    );
+    store.saveResult(
+      makeTier1Result({ ein, score: 90, recommendation: "PASS" }),
+    );
 
     const latest = store.getLatestByEin(ein);
     expect(latest).not.toBeNull();
@@ -103,18 +112,22 @@ describe("VettingStore", () => {
     store.initialize();
 
     store.saveResult(makeTier1Result({ recommendation: "PASS", score: 85 }));
-    store.saveResult(makeTier1Result({
-      ein: "222222222",
-      recommendation: "REVIEW",
-      score: 60,
-      passed: false,
-    }));
-    store.saveResult(makeTier1Result({
-      ein: "333333333",
-      recommendation: "REJECT",
-      score: 30,
-      passed: false,
-    }));
+    store.saveResult(
+      makeTier1Result({
+        ein: "222222222",
+        recommendation: "REVIEW",
+        score: 60,
+        passed: false,
+      }),
+    );
+    store.saveResult(
+      makeTier1Result({
+        ein: "333333333",
+        recommendation: "REJECT",
+        score: 30,
+        passed: false,
+      }),
+    );
 
     const passResults = store.listVetted({ recommendation: "PASS" });
     expect(passResults).toHaveLength(1);
@@ -161,23 +174,29 @@ describe("VettingStore", () => {
     store.initialize();
 
     store.saveResult(makeTier1Result({ recommendation: "PASS", score: 85 }));
-    store.saveResult(makeTier1Result({
-      ein: "222222222",
-      recommendation: "PASS",
-      score: 80,
-    }));
-    store.saveResult(makeTier1Result({
-      ein: "333333333",
-      recommendation: "REVIEW",
-      score: 60,
-      passed: false,
-    }));
-    store.saveResult(makeTier1Result({
-      ein: "444444444",
-      recommendation: "REJECT",
-      score: 30,
-      passed: false,
-    }));
+    store.saveResult(
+      makeTier1Result({
+        ein: "222222222",
+        recommendation: "PASS",
+        score: 80,
+      }),
+    );
+    store.saveResult(
+      makeTier1Result({
+        ein: "333333333",
+        recommendation: "REVIEW",
+        score: 60,
+        passed: false,
+      }),
+    );
+    store.saveResult(
+      makeTier1Result({
+        ein: "444444444",
+        recommendation: "REJECT",
+        score: 30,
+        passed: false,
+      }),
+    );
 
     const stats = store.getStats();
     expect(stats.total).toBe(4);

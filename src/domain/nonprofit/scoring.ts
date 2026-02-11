@@ -438,7 +438,12 @@ export function runTier1Checks(
   courtResult?: CourtRecordsResult,
 ): Tier1Result {
   // Layer 1: Pre-screen gates
-  const gateResult = runPreScreenGates(profile, irsClient, ofacClient, portfolioFitConfig);
+  const gateResult = runPreScreenGates(
+    profile,
+    irsClient,
+    ofacClient,
+    portfolioFitConfig,
+  );
 
   if (!gateResult.all_passed) {
     // Gate-blocked: REJECT immediately, no scoring

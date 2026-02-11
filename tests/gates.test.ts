@@ -41,7 +41,10 @@ function makeMockOfacClient(matched = false) {
 
 describe("Gate 1: checkVerified501c3", () => {
   it("passes when all 3 sub-checks pass", () => {
-    const profile = makeProfile({ subsection: "03", ruling_date: "2010-01-01" });
+    const profile = makeProfile({
+      subsection: "03",
+      ruling_date: "2010-01-01",
+    });
     const irsClient = makeMockIrsClient(false);
 
     const result = checkVerified501c3(profile, irsClient as any);
@@ -202,7 +205,11 @@ describe("runPreScreenGates", () => {
   });
 
   it("reports first failure as blocking_gate when multiple gates fail", () => {
-    const profile = makeProfile({ subsection: "05", filing_count: 0, latest_990: null });
+    const profile = makeProfile({
+      subsection: "05",
+      filing_count: 0,
+      latest_990: null,
+    });
     const irsClient = makeMockIrsClient(false);
     const ofacClient = makeMockOfacClient(true);
 
