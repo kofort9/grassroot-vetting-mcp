@@ -2,6 +2,7 @@ import { vi } from "vitest";
 import type {
   NonprofitProfile,
   VettingThresholds,
+  PortfolioFitConfig,
   ProPublica990Filing,
   Latest990Summary,
   IrsRevocationRow,
@@ -258,6 +259,22 @@ export function makeMockIrsClient() {
 export function makeMockOfacClient() {
   return {
     check: vi.fn().mockReturnValue(makeCleanOfacResult()),
+  };
+}
+
+// ============================================================================
+// Portfolio-Fit Config Factory
+// ============================================================================
+
+export function makePortfolioFitConfig(
+  overrides?: Partial<PortfolioFitConfig>,
+): PortfolioFitConfig {
+  return {
+    enabled: true,
+    allowedNteeCategories: ["A", "B", "E", "K", "L", "P", "S"],
+    excludedEins: [],
+    includedEins: [],
+    ...overrides,
   };
 }
 

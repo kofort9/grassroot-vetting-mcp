@@ -159,6 +159,17 @@ export interface RedFlagResult {
 }
 
 // ============================================================================
+// Portfolio-Fit Config (Platform Eligibility Policy)
+// ============================================================================
+
+export interface PortfolioFitConfig {
+  enabled: boolean;                    // false = gate always passes (opt-in)
+  allowedNteeCategories: string[];     // Prefix matching: ["A", "B", "N2", "P"]
+  excludedEins: string[];              // Hard block (checked first, always wins)
+  includedEins: string[];              // Hard allow (skips NTEE check)
+}
+
+// ============================================================================
 // Vetting Thresholds (Configurable via Environment Variables)
 // ============================================================================
 

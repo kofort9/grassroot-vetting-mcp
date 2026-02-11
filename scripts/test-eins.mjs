@@ -33,7 +33,7 @@ console.log('=== Tier 1 Vetting Results ===\n');
 
 for (const { label, ein } of eins) {
   try {
-    const result = await tools.checkTier1(client, { ein }, config.thresholds, irsClient, ofacClient);
+    const result = await tools.checkTier1(client, { ein }, config.thresholds, irsClient, ofacClient, config.portfolioFit);
     if (result.success && result.data) {
       const d = result.data;
       const flags = d.red_flags.map(f => `${f.type}(${f.severity})`).join(', ') || 'none';

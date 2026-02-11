@@ -20,6 +20,7 @@ import {
   taxPrdOffset,
   makeMockIrsClient,
   makeMockOfacClient,
+  makePortfolioFitConfig,
   makeRevokedIrsResult,
   makeFlaggedCourtResult,
 } from './fixtures.js';
@@ -526,7 +527,7 @@ describe('runTier1Checks', () => {
     const profile = makeProfile();
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any);
+    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any, makePortfolioFitConfig());
 
     expect(result.recommendation).toBe('PASS');
     expect(result.passed).toBe(true);
@@ -543,7 +544,7 @@ describe('runTier1Checks', () => {
     const irsClient = makeMockIrsClient();
     irsClient.check.mockReturnValue(makeRevokedIrsResult());
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any);
+    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any, makePortfolioFitConfig());
 
     expect(result.recommendation).toBe('REJECT');
     expect(result.passed).toBe(false);
@@ -556,7 +557,7 @@ describe('runTier1Checks', () => {
     const profile = makeProfile({ subsection: '04' });
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any);
+    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any, makePortfolioFitConfig());
 
     expect(result.recommendation).toBe('REJECT');
     expect(result.gate_blocked).toBe(true);
@@ -572,7 +573,7 @@ describe('runTier1Checks', () => {
     });
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(profile, [], t, irsClient as any, ofacClient as any);
+    const result = runTier1Checks(profile, [], t, irsClient as any, ofacClient as any, makePortfolioFitConfig());
 
     expect(result.recommendation).toBe('REJECT');
     // Gate 1 passes (subsection 03 + not revoked + has ruling_date... wait, ruling_date is '')
@@ -586,7 +587,7 @@ describe('runTier1Checks', () => {
   it('has empty review_reasons for a clean PASS profile', () => {
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(makeProfile(), [makeFiling()], t, irsClient as any, ofacClient as any);
+    const result = runTier1Checks(makeProfile(), [makeFiling()], t, irsClient as any, ofacClient as any, makePortfolioFitConfig());
     expect(result.review_reasons).toEqual([]);
   });
 
@@ -595,7 +596,7 @@ describe('runTier1Checks', () => {
     const profile = makeProfile({ years_operating: 2 });
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any);
+    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any, makePortfolioFitConfig());
 
     expect(result.review_reasons.length).toBeGreaterThan(0);
     expect(result.review_reasons.some(r => r.includes('newer organization'))).toBe(true);
@@ -606,7 +607,7 @@ describe('runTier1Checks', () => {
     const profile = makeProfile({ latest_990: make990({ total_revenue: 10_000 }) });
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any);
+    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any, makePortfolioFitConfig());
 
     expect(result.review_reasons.some(r => r.includes('too small'))).toBe(true);
   });
@@ -616,7 +617,7 @@ describe('runTier1Checks', () => {
     const profile = makeProfile({ latest_990: make990({ tax_period: '2018-06' }) });
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any);
+    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any, makePortfolioFitConfig());
 
     expect(result.review_reasons.some(r => r.startsWith('RED FLAG:'))).toBe(true);
   });
@@ -626,7 +627,7 @@ describe('runTier1Checks', () => {
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
     const courtResult = makeFlaggedCourtResult(3);
-    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any, courtResult);
+    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any, makePortfolioFitConfig(), courtResult);
 
     expect(result.red_flags).toContainEqual(
       expect.objectContaining({ type: 'court_records', severity: 'HIGH' })
@@ -637,7 +638,7 @@ describe('runTier1Checks', () => {
     const profile = makeProfile({ subsection: '04' });
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any);
+    const result = runTier1Checks(profile, [makeFiling()], t, irsClient as any, ofacClient as any, makePortfolioFitConfig());
 
     expect(result.review_reasons.some(r => r.includes('Gate failure'))).toBe(true);
   });

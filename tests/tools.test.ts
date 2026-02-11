@@ -15,6 +15,7 @@ import {
   makeFiling,
   makeMockIrsClient,
   makeMockOfacClient,
+  makePortfolioFitConfig,
 } from './fixtures.js';
 
 // ============================================================================
@@ -242,21 +243,21 @@ describe('checkTier1', () => {
   });
 
   it('returns error for missing EIN', async () => {
-    const result = await checkTier1(client, { ein: '' }, t, irsClient as any, ofacClient as any);
+    const result = await checkTier1(client, { ein: '' }, t, irsClient as any, ofacClient as any, makePortfolioFitConfig());
     expect(result.success).toBe(false);
     expect(result.error).toContain('required');
   });
 
   it('returns error when organization not found', async () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-    const result = await checkTier1(client, { ein: '12-3456789' }, t, irsClient as any, ofacClient as any);
+    const result = await checkTier1(client, { ein: '12-3456789' }, t, irsClient as any, ofacClient as any, makePortfolioFitConfig());
     expect(result.success).toBe(false);
     expect(result.error).toContain('not found');
   });
 
   it('returns Tier1Result on success', async () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(makeOrgResponse());
-    const result = await checkTier1(client, { ein: '95-3135649' }, t, irsClient as any, ofacClient as any);
+    const result = await checkTier1(client, { ein: '95-3135649' }, t, irsClient as any, ofacClient as any, makePortfolioFitConfig());
 
     expect(result.success).toBe(true);
     expect(result.data).toBeDefined();
@@ -271,14 +272,14 @@ describe('checkTier1', () => {
 
   it('healthy org passes with default thresholds', async () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(makeOrgResponse());
-    const result = await checkTier1(client, { ein: '95-3135649' }, t, irsClient as any, ofacClient as any);
+    const result = await checkTier1(client, { ein: '95-3135649' }, t, irsClient as any, ofacClient as any, makePortfolioFitConfig());
     expect(result.data?.recommendation).toBe('PASS');
     expect(result.data?.score).toBeGreaterThanOrEqual(75);
   });
 
   it('includes summary in result', async () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(makeOrgResponse());
-    const result = await checkTier1(client, { ein: '95-3135649' }, t, irsClient as any, ofacClient as any);
+    const result = await checkTier1(client, { ein: '95-3135649' }, t, irsClient as any, ofacClient as any, makePortfolioFitConfig());
     expect(result.data?.summary).toBeDefined();
     expect(result.data?.summary.headline).toBeTypeOf('string');
     expect(result.data?.summary.key_factors).toBeInstanceOf(Array);
@@ -289,7 +290,7 @@ describe('checkTier1', () => {
     const response = makeOrgResponse();
     response.organization.subsection_code = 6; // Non-501(c)(3) → Gate 1 fail
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(response);
-    const result = await checkTier1(client, { ein: '95-3135649' }, t, irsClient as any, ofacClient as any);
+    const result = await checkTier1(client, { ein: '95-3135649' }, t, irsClient as any, ofacClient as any, makePortfolioFitConfig());
 
     expect(result.success).toBe(true);
     expect(result.data?.gate_blocked).toBe(true);
@@ -300,7 +301,7 @@ describe('checkTier1', () => {
 
   it('handles client error gracefully', async () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('API down'));
-    const result = await checkTier1(client, { ein: '95-3135649' }, t, irsClient as any, ofacClient as any);
+    const result = await checkTier1(client, { ein: '95-3135649' }, t, irsClient as any, ofacClient as any, makePortfolioFitConfig());
     expect(result.success).toBe(false);
     expect(result.error).toContain('API down');
   });

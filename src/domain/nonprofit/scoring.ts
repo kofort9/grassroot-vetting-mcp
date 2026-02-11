@@ -8,6 +8,7 @@ import {
   ProPublica990Filing,
   VettingThresholds,
   CourtRecordsResult,
+  PortfolioFitConfig,
 } from "./types.js";
 import { generateSummary, generateGateFailureSummary } from "./messages.js";
 import type { IrsRevocationClient } from "../red-flags/irs-revocation-client.js";
@@ -433,10 +434,11 @@ export function runTier1Checks(
   t: VettingThresholds,
   irsClient: IrsRevocationClient,
   ofacClient: OfacSdnClient,
+  portfolioFitConfig: PortfolioFitConfig,
   courtResult?: CourtRecordsResult,
 ): Tier1Result {
   // Layer 1: Pre-screen gates
-  const gateResult = runPreScreenGates(profile, irsClient, ofacClient);
+  const gateResult = runPreScreenGates(profile, irsClient, ofacClient, portfolioFitConfig);
 
   if (!gateResult.all_passed) {
     // Gate-blocked: REJECT immediately, no scoring

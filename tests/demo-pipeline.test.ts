@@ -15,6 +15,7 @@ import {
   makeFiling,
   makeMockIrsClient,
   makeMockOfacClient,
+  makePortfolioFitConfig,
   makeRevokedIrsResult,
   makeMatchedOfacResult,
   makeFlaggedCourtResult,
@@ -37,12 +38,12 @@ describe('Full Tier 1 Pipeline Demo', () => {
     const irs = makeMockIrsClient();
     const ofac = makeMockOfacClient();
 
-    const result = runTier1Checks(profile, filings, t, irs as any, ofac as any);
+    const result = runTier1Checks(profile, filings, t, irs as any, ofac as any, makePortfolioFitConfig());
 
     // Gates all pass
     expect(result.gate_blocked).toBe(false);
     expect(result.gates.all_passed).toBe(true);
-    expect(result.gates.gates).toHaveLength(3);
+    expect(result.gates.gates).toHaveLength(4);
     expect(result.gates.gates.every(g => g.verdict === 'PASS')).toBe(true);
 
     // Scoring: 4 checks, all PASS
@@ -78,7 +79,7 @@ describe('Full Tier 1 Pipeline Demo', () => {
     // IRS says revoked
     irs.check.mockReturnValue(makeRevokedIrsResult());
 
-    const result = runTier1Checks(profile, filings, t, irs as any, ofac as any);
+    const result = runTier1Checks(profile, filings, t, irs as any, ofac as any, makePortfolioFitConfig());
 
     // Gate-blocked at Gate 1
     expect(result.gate_blocked).toBe(true);
@@ -113,16 +114,17 @@ describe('Full Tier 1 Pipeline Demo', () => {
     // OFAC says matched
     ofac.check.mockReturnValue(makeMatchedOfacResult());
 
-    const result = runTier1Checks(profile, filings, t, irs as any, ofac as any);
+    const result = runTier1Checks(profile, filings, t, irs as any, ofac as any, makePortfolioFitConfig());
 
     expect(result.gate_blocked).toBe(true);
     expect(result.gates.blocking_gate).toBe('ofac_sanctions');
 
-    // Gate 1 passed, Gate 2 failed, Gate 3 still ran (per spec)
-    expect(result.gates.gates).toHaveLength(3);
+    // Gate 1 passed, Gate 2 failed, Gates 3-4 still ran (per spec)
+    expect(result.gates.gates).toHaveLength(4);
     expect(result.gates.gates[0].verdict).toBe('PASS'); // 501c3
     expect(result.gates.gates[1].verdict).toBe('FAIL'); // OFAC
     expect(result.gates.gates[2].verdict).toBe('PASS'); // filing exists
+    expect(result.gates.gates[3].verdict).toBe('PASS'); // portfolio fit
   });
 
   // -----------------------------------------------------------------
@@ -149,7 +151,7 @@ describe('Full Tier 1 Pipeline Demo', () => {
     const irs = makeMockIrsClient();
     const ofac = makeMockOfacClient();
 
-    const result = runTier1Checks(profile, filings, t, irs as any, ofac as any);
+    const result = runTier1Checks(profile, filings, t, irs as any, ofac as any, makePortfolioFitConfig());
 
     expect(result.gate_blocked).toBe(false);
 
@@ -177,7 +179,7 @@ describe('Full Tier 1 Pipeline Demo', () => {
     const courtResult = makeFlaggedCourtResult(4); // 3+ = HIGH
 
     const result = runTier1Checks(
-      profile, filings, t, irs as any, ofac as any, courtResult,
+      profile, filings, t, irs as any, ofac as any, makePortfolioFitConfig(), courtResult,
     );
 
     // Gates pass (org is a valid 501c3)
@@ -219,7 +221,7 @@ describe('Full Tier 1 Pipeline Demo', () => {
     const irs = makeMockIrsClient();
     const ofac = makeMockOfacClient();
 
-    const result = runTier1Checks(profile, filings, t, irs as any, ofac as any);
+    const result = runTier1Checks(profile, filings, t, irs as any, ofac as any, makePortfolioFitConfig());
 
     expect(result.gate_blocked).toBe(false);
     expect(result.red_flags.some(f => f.type === 'revenue_decline')).toBe(true);

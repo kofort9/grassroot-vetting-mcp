@@ -21,7 +21,7 @@ const SERVER_VERSION = "1.1.0";
 // Load configuration and initialize clients
 const config = loadConfig();
 const propublicaClient = new ProPublicaClient(config.propublica);
-const { thresholds } = config;
+const { thresholds, portfolioFit } = config;
 
 // Data store for IRS revocation + OFAC SDN lists
 const dataStore = new CsvDataStore(config.redFlag);
@@ -97,7 +97,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "check_tier1",
         description:
-          "Run Tier 1 vetting. Three layers: (1) Pre-screen gates — verified 501(c)(3), OFAC sanctions, 990 filing exists. (2) Scoring engine — years, revenue, expense ratio, 990 recency (100 pts). (3) Red flag overlay. Thresholds: 75+ PASS, 50-74 REVIEW, <50 REJECT. Results are saved and cached — re-vetting returns the cached result unless force_refresh is true.",
+          "Run Tier 1 vetting. Three layers: (1) Pre-screen gates — verified 501(c)(3), OFAC sanctions, 990 filing exists, portfolio fit (NTEE category). (2) Scoring engine — years, revenue, expense ratio, 990 recency (100 pts). (3) Red flag overlay. Thresholds: 75+ PASS, 50-74 REVIEW, <50 REJECT. Results are saved and cached — re-vetting returns the cached result unless force_refresh is true.",
         inputSchema: {
           type: "object",
           properties: {
@@ -264,6 +264,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         thresholds,
         irsClient,
         ofacClient,
+        portfolioFit,
         courtClient,
       );
 

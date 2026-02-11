@@ -9,6 +9,7 @@ import {
   makeRevokedIrsResult,
   makeCleanOfacResult,
   makeMatchedOfacResult,
+  makePortfolioFitConfig,
   make990,
 } from "./fixtures.js";
 
@@ -166,6 +167,8 @@ describe("Gate 3: checkFilingExists", () => {
 // ============================================================================
 
 describe("runPreScreenGates", () => {
+  const defaultFitConfig = makePortfolioFitConfig();
+
   it("returns all_passed when all gates pass", () => {
     const profile = makeProfile();
     const irsClient = makeMockIrsClient(false);
@@ -175,9 +178,10 @@ describe("runPreScreenGates", () => {
       profile,
       irsClient as any,
       ofacClient as any,
+      defaultFitConfig,
     );
     expect(result.all_passed).toBe(true);
-    expect(result.gates).toHaveLength(3);
+    expect(result.gates).toHaveLength(4);
     expect(result.blocking_gate).toBeUndefined();
   });
 
@@ -190,9 +194,10 @@ describe("runPreScreenGates", () => {
       profile,
       irsClient as any,
       ofacClient as any,
+      defaultFitConfig,
     );
     expect(result.all_passed).toBe(false);
-    expect(result.gates).toHaveLength(3);
+    expect(result.gates).toHaveLength(4);
     expect(result.blocking_gate).toBe("verified_501c3");
   });
 
@@ -205,17 +210,18 @@ describe("runPreScreenGates", () => {
       profile,
       irsClient as any,
       ofacClient as any,
+      defaultFitConfig,
     );
     expect(result.all_passed).toBe(false);
-    expect(result.gates).toHaveLength(3);
+    expect(result.gates).toHaveLength(4);
     // First failure is Gate 1
     expect(result.blocking_gate).toBe("verified_501c3");
-    // But all 3 gates ran — Gate 2 and 3 also failed
+    // But all 4 gates ran — Gate 2 and 3 also failed
     expect(result.gates[1].verdict).toBe("FAIL");
     expect(result.gates[2].verdict).toBe("FAIL");
   });
 
-  it("Gate 2 failure still runs Gate 3 — gates array has length 3", () => {
+  it("Gate 2 failure still runs Gates 3 and 4 — gates array has length 4", () => {
     const profile = makeProfile();
     const irsClient = makeMockIrsClient(false);
     const ofacClient = makeMockOfacClient(true);
@@ -224,9 +230,10 @@ describe("runPreScreenGates", () => {
       profile,
       irsClient as any,
       ofacClient as any,
+      defaultFitConfig,
     );
     expect(result.all_passed).toBe(false);
-    expect(result.gates).toHaveLength(3);
+    expect(result.gates).toHaveLength(4);
     expect(result.blocking_gate).toBe("ofac_sanctions");
   });
 
@@ -239,9 +246,50 @@ describe("runPreScreenGates", () => {
       profile,
       irsClient as any,
       ofacClient as any,
+      defaultFitConfig,
     );
     expect(result.all_passed).toBe(false);
-    expect(result.gates).toHaveLength(3);
+    expect(result.gates).toHaveLength(4);
     expect(result.blocking_gate).toBe("filing_exists");
+  });
+
+  it("Gate 4 can block when NTEE is outside portfolio scope", () => {
+    const fitConfig = makePortfolioFitConfig({
+      allowedNteeCategories: ["A", "B"],
+    });
+    const profile = makeProfile({ ntee_code: "Z99" });
+    const irsClient = makeMockIrsClient(false);
+    const ofacClient = makeMockOfacClient(false);
+
+    const result = runPreScreenGates(
+      profile,
+      irsClient as any,
+      ofacClient as any,
+      fitConfig,
+    );
+    expect(result.all_passed).toBe(false);
+    expect(result.gates).toHaveLength(4);
+    expect(result.blocking_gate).toBe("portfolio_fit");
+  });
+
+  it("all 4 gates always run even when Gate 4 fails", () => {
+    const fitConfig = makePortfolioFitConfig({
+      allowedNteeCategories: [],
+    });
+    const profile = makeProfile({ ntee_code: "K31" });
+    const irsClient = makeMockIrsClient(false);
+    const ofacClient = makeMockOfacClient(false);
+
+    const result = runPreScreenGates(
+      profile,
+      irsClient as any,
+      ofacClient as any,
+      fitConfig,
+    );
+    expect(result.gates).toHaveLength(4);
+    expect(result.gates[0].verdict).toBe("PASS"); // 501c3
+    expect(result.gates[1].verdict).toBe("PASS"); // OFAC
+    expect(result.gates[2].verdict).toBe("PASS"); // filing
+    expect(result.gates[3].verdict).toBe("FAIL"); // portfolio_fit
   });
 });

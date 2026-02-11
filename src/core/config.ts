@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import { VettingThresholds } from "../domain/nonprofit/types.js";
+import { VettingThresholds, PortfolioFitConfig } from "../domain/nonprofit/types.js";
 
 // Load environment variables
 dotenv.config();
@@ -25,6 +25,7 @@ export interface AppConfig {
   propublica: ProPublicaConfig;
   redFlag: RedFlagConfig;
   thresholds: VettingThresholds;
+  portfolioFit: PortfolioFitConfig;
 }
 
 // Security: Only allow official ProPublica API endpoint
@@ -215,6 +216,40 @@ export function loadRedFlagConfig(): RedFlagConfig {
   };
 }
 
+// ============================================================================
+// Portfolio-Fit Config
+// ============================================================================
+
+/** Default NTEE allowlist: all major categories except Q, T, V, X, Y, Z */
+const DEFAULT_ALLOWED_NTEE = [
+  "A", "B", "C", "D", "E", "F", "G",
+  "H", "I", "J", "K", "L", "M",
+  "N", "O", "P", "R", "S", "U", "W",
+];
+
+function parseEinList(raw?: string): string[] {
+  if (!raw) return [];
+  return raw.split(",").map(s => s.trim().replace(/[-\s]/g, "")).filter(Boolean);
+}
+
+/**
+ * Loads portfolio-fit gate configuration from environment variables.
+ * Enabled by default — set PORTFOLIO_FIT_ENABLED=false to disable.
+ */
+export function loadPortfolioFitConfig(): PortfolioFitConfig {
+  const raw = process.env.PORTFOLIO_FIT_NTEE;
+  return {
+    enabled: !["false", "0", "no", "off"].includes(
+      (process.env.PORTFOLIO_FIT_ENABLED ?? "").trim().toLowerCase(),
+    ),
+    allowedNteeCategories: raw
+      ? raw.split(",").map(s => s.trim().toUpperCase()).filter(Boolean)
+      : DEFAULT_ALLOWED_NTEE,
+    excludedEins: parseEinList(process.env.PORTFOLIO_FIT_EXCLUDED_EINS),
+    includedEins: parseEinList(process.env.PORTFOLIO_FIT_INCLUDED_EINS),
+  };
+}
+
 /**
  * Loads full application config — backward compatible via loadConfig()
  */
@@ -225,5 +260,6 @@ export function loadConfig(): AppConfig {
     propublica: loadProPublicaConfig(),
     redFlag: loadRedFlagConfig(),
     thresholds,
+    portfolioFit: loadPortfolioFitConfig(),
   };
 }

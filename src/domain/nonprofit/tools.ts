@@ -11,6 +11,7 @@ import {
   ProPublicaOrgDetailResponse,
   ProPublica990Filing,
   CourtRecordsResult,
+  PortfolioFitConfig,
 } from "./types.js";
 import { runTier1Checks, runRedFlagCheck } from "./scoring.js";
 import { resolveThresholds } from "./sector-thresholds.js";
@@ -254,6 +255,7 @@ export async function checkTier1(
   thresholds: VettingThresholds,
   irsClient: IrsRevocationClient,
   ofacClient: OfacSdnClient,
+  portfolioFitConfig: PortfolioFitConfig,
   courtClient?: CourtListenerClient,
 ): Promise<ToolResponse<Tier1Result>> {
   return withEinLookup(
@@ -278,6 +280,7 @@ export async function checkTier1(
         resolveThresholds(thresholds, profile.ntee_code),
         irsClient,
         ofacClient,
+        portfolioFitConfig,
         courtResult,
       );
     },

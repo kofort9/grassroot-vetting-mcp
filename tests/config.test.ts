@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { validateThresholds } from '../src/core/config.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { validateThresholds, loadPortfolioFitConfig } from '../src/core/config.js';
 import { DEFAULT_THRESHOLDS, makeThresholds } from './fixtures.js';
 
 describe('validateThresholds', () => {
@@ -119,5 +119,126 @@ describe('validateThresholds', () => {
     expect(caught!.message).toContain('non-negative');
     expect(caught!.message).toContain('revenueFailMin');
     expect(caught!.message).toContain('scorePassMin');
+  });
+});
+
+// ============================================================================
+// loadPortfolioFitConfig
+// ============================================================================
+
+describe('loadPortfolioFitConfig', () => {
+  const ENV_KEYS = [
+    'PORTFOLIO_FIT_ENABLED',
+    'PORTFOLIO_FIT_NTEE',
+    'PORTFOLIO_FIT_EXCLUDED_EINS',
+    'PORTFOLIO_FIT_INCLUDED_EINS',
+  ];
+  const saved: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    for (const key of ENV_KEYS) {
+      saved[key] = process.env[key];
+      delete process.env[key];
+    }
+  });
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  });
+
+  // --- enabled flag ---
+
+  it('enabled by default when PORTFOLIO_FIT_ENABLED is unset', () => {
+    const config = loadPortfolioFitConfig();
+    expect(config.enabled).toBe(true);
+  });
+
+  it('disabled when PORTFOLIO_FIT_ENABLED=false', () => {
+    process.env.PORTFOLIO_FIT_ENABLED = 'false';
+    expect(loadPortfolioFitConfig().enabled).toBe(false);
+  });
+
+  it('disabled when PORTFOLIO_FIT_ENABLED=0', () => {
+    process.env.PORTFOLIO_FIT_ENABLED = '0';
+    expect(loadPortfolioFitConfig().enabled).toBe(false);
+  });
+
+  it('disabled when PORTFOLIO_FIT_ENABLED=no (case-insensitive)', () => {
+    process.env.PORTFOLIO_FIT_ENABLED = 'NO';
+    expect(loadPortfolioFitConfig().enabled).toBe(false);
+  });
+
+  it('disabled when PORTFOLIO_FIT_ENABLED=off', () => {
+    process.env.PORTFOLIO_FIT_ENABLED = 'off';
+    expect(loadPortfolioFitConfig().enabled).toBe(false);
+  });
+
+  it('handles whitespace around PORTFOLIO_FIT_ENABLED value', () => {
+    process.env.PORTFOLIO_FIT_ENABLED = '  false  ';
+    expect(loadPortfolioFitConfig().enabled).toBe(false);
+  });
+
+  it('enabled for unknown values (e.g. "yes", "true", "1")', () => {
+    process.env.PORTFOLIO_FIT_ENABLED = 'yes';
+    expect(loadPortfolioFitConfig().enabled).toBe(true);
+  });
+
+  // --- NTEE categories ---
+
+  it('uses default allowlist when PORTFOLIO_FIT_NTEE is unset', () => {
+    const config = loadPortfolioFitConfig();
+    expect(config.allowedNteeCategories).toContain('A');
+    expect(config.allowedNteeCategories).toContain('P');
+    expect(config.allowedNteeCategories).not.toContain('Q');
+    expect(config.allowedNteeCategories).not.toContain('Z');
+    expect(config.allowedNteeCategories).toHaveLength(20);
+  });
+
+  it('parses CSV NTEE categories and uppercases them', () => {
+    process.env.PORTFOLIO_FIT_NTEE = 'a,b,n2';
+    const config = loadPortfolioFitConfig();
+    expect(config.allowedNteeCategories).toEqual(['A', 'B', 'N2']);
+  });
+
+  it('filters empty strings from NTEE CSV (trailing comma)', () => {
+    process.env.PORTFOLIO_FIT_NTEE = 'A,B,';
+    const config = loadPortfolioFitConfig();
+    expect(config.allowedNteeCategories).toEqual(['A', 'B']);
+    expect(config.allowedNteeCategories).not.toContain('');
+  });
+
+  it('trims whitespace from NTEE categories', () => {
+    process.env.PORTFOLIO_FIT_NTEE = ' P , K , N2 ';
+    const config = loadPortfolioFitConfig();
+    expect(config.allowedNteeCategories).toEqual(['P', 'K', 'N2']);
+  });
+
+  // --- EIN lists ---
+
+  it('returns empty EIN lists when env vars unset', () => {
+    const config = loadPortfolioFitConfig();
+    expect(config.excludedEins).toEqual([]);
+    expect(config.includedEins).toEqual([]);
+  });
+
+  it('parses and normalizes excluded EINs (strips hyphens)', () => {
+    process.env.PORTFOLIO_FIT_EXCLUDED_EINS = '95-3135649,12-3456789';
+    const config = loadPortfolioFitConfig();
+    expect(config.excludedEins).toEqual(['953135649', '123456789']);
+  });
+
+  it('parses and normalizes included EINs (strips hyphens)', () => {
+    process.env.PORTFOLIO_FIT_INCLUDED_EINS = '95-3135649';
+    const config = loadPortfolioFitConfig();
+    expect(config.includedEins).toEqual(['953135649']);
+  });
+
+  it('filters empty entries from EIN lists (trailing comma)', () => {
+    process.env.PORTFOLIO_FIT_EXCLUDED_EINS = '953135649,,';
+    const config = loadPortfolioFitConfig();
+    expect(config.excludedEins).toEqual(['953135649']);
   });
 });
