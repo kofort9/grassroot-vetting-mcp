@@ -123,6 +123,7 @@ export function makeIrsRow(
     ein: "123456789",
     legalName: "REVOKED NONPROFIT INC",
     dba: "",
+    address: "123 MAIN ST",
     city: "NEW YORK",
     state: "NY",
     zip: "10001",

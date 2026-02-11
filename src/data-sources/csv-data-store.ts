@@ -237,7 +237,7 @@ export class CsvDataStore {
       if (!line) continue;
 
       const fields = line.split("|");
-      if (fields.length < 11) continue;
+      if (fields.length < 12) continue;
 
       const ein = fields[0].trim().replace(/[-\s]/g, "");
       if (!/^\d{9}$/.test(ein)) continue;
@@ -246,14 +246,15 @@ export class CsvDataStore {
         ein,
         legalName: fields[1]?.trim() || "",
         dba: fields[2]?.trim() || "",
-        city: fields[3]?.trim() || "",
-        state: fields[4]?.trim() || "",
-        zip: fields[5]?.trim() || "",
-        country: fields[6]?.trim() || "",
-        exemptionType: fields[7]?.trim() || "",
-        revocationDate: fields[8]?.trim() || "",
-        postingDate: fields[9]?.trim() || "",
-        reinstatementDate: fields[10]?.trim() || "",
+        address: fields[3]?.trim() || "",
+        city: fields[4]?.trim() || "",
+        state: fields[5]?.trim() || "",
+        zip: fields[6]?.trim() || "",
+        country: fields[7]?.trim() || "",
+        exemptionType: fields[8]?.trim() || "",
+        revocationDate: fields[9]?.trim() || "",
+        postingDate: fields[10]?.trim() || "",
+        reinstatementDate: fields[11]?.trim() || "",
       };
 
       map.set(ein, row);

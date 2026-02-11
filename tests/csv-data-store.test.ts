@@ -67,16 +67,20 @@ function makeConfig(overrides?: Partial<RedFlagConfig>): RedFlagConfig {
 
 /**
  * Generate a minimal IRS pipe-delimited CSV with N rows.
- * Format: EIN|LegalName|DBA|City|State|Zip|Country|ExemptionType|RevDate|PostDate|ReinDate
+ * Format: EIN|LegalName|DBA|Address|City|State|Zip|Country|ExemptionType|RevDate|PostDate|ReinDate
+ *
+ * The IRS revocation CSV has 12 pipe-delimited columns. The Address field
+ * at index 3 is critical — omitting it causes an off-by-one that shifts
+ * all subsequent fields (see BON-39).
  */
 function makeIrsCsv(rowCount: number): string {
   const header =
-    "EIN|Legal Name|DBA Name|City|State|ZIP Code|Country|Exemption Type|Revocation Date|Posting Date|Reinstatement Date";
+    "EIN|Legal Name|DBA Name|Address|City|State|ZIP Code|Country|Exemption Type|Revocation Date|Posting Date|Reinstatement Date";
   const lines = [header];
   for (let i = 0; i < rowCount; i++) {
     const ein = String(100000000 + i);
     lines.push(
-      `${ein}|ORG ${i}|DBA ${i}|CITY|CA|90001|US|03|2022-01-01|2022-02-01|`,
+      `${ein}|ORG ${i}|DBA ${i}|123 MAIN ST|CITY|CA|90001|US|03|15-JAN-2022|01-MAR-2022|`,
     );
   }
   return lines.join("\n");
@@ -188,11 +192,11 @@ describe("CsvDataStore", () => {
       expect(store.irsRowCount).toBe(500_000);
     });
 
-    it("skips malformed rows (< 11 fields)", async () => {
+    it("skips malformed rows (< 12 fields)", async () => {
       const header =
-        "EIN|Name|DBA|City|State|Zip|Country|Type|RevDate|PostDate|ReinDate";
+        "EIN|Name|DBA|Address|City|State|Zip|Country|Type|RevDate|PostDate|ReinDate";
       const good =
-        "123456789|GOOD ORG|DBA|CITY|CA|90001|US|03|2022-01-01|2022-02-01|";
+        "123456789|GOOD ORG|DBA|123 MAIN ST|CITY|CA|90001|US|03|15-JAN-2022|01-MAR-2022|";
       const bad = "987654321|BAD ROW|too few fields";
       const csv = [header, good, bad].join("\n");
 
@@ -209,13 +213,13 @@ describe("CsvDataStore", () => {
 
     it("skips rows with invalid EIN format", async () => {
       const header =
-        "EIN|Name|DBA|City|State|Zip|Country|Type|RevDate|PostDate|ReinDate";
+        "EIN|Name|DBA|Address|City|State|Zip|Country|Type|RevDate|PostDate|ReinDate";
       const valid =
-        "123456789|VALID ORG|DBA|CITY|CA|90001|US|03|2022-01-01|2022-02-01|";
+        "123456789|VALID ORG|DBA|123 MAIN ST|CITY|CA|90001|US|03|15-JAN-2022|01-MAR-2022|";
       const letters =
-        "ABC123456|LETTER ORG|DBA|CITY|CA|90001|US|03|2022-01-01|2022-02-01|";
+        "ABC123456|LETTER ORG|DBA|123 MAIN ST|CITY|CA|90001|US|03|15-JAN-2022|01-MAR-2022|";
       const short =
-        "12345|SHORT ORG|DBA|CITY|CA|90001|US|03|2022-01-01|2022-02-01|";
+        "12345|SHORT ORG|DBA|123 MAIN ST|CITY|CA|90001|US|03|15-JAN-2022|01-MAR-2022|";
       const csv = [header, valid, letters, short].join("\n");
 
       setupIrsDisk(csv);
@@ -223,6 +227,40 @@ describe("CsvDataStore", () => {
       await store.initialize();
 
       expect(store.irsRowCount).toBe(1);
+    });
+
+    it("maps all 12 IRS columns to correct fields (BON-39 regression)", async () => {
+      const header =
+        "EIN|Legal Name|DBA Name|Address|City|State|ZIP Code|Country|Exemption Type|Revocation Date|Posting Date|Reinstatement Date";
+      const revoked =
+        "010571515|ESTHER MINISTRIES ||PO BOX 16774|ENCINO|CA|91416-6774|US|03|15-MAY-2023|14-AUG-2023|";
+      const reinstated =
+        "001037180|MIDDLESEX BARBARIANS R F C INC||37 BOW ST|WOBURN|MA|01801-3636|US|00|15-JUN-2013|21-OCT-2013|15-JUN-2013";
+      const csv = [header, revoked, reinstated].join("\n");
+
+      setupIrsDisk(csv);
+      const store = new CsvDataStore(makeConfig());
+      await store.initialize();
+
+      // Revoked org: verify every field is in the right slot
+      const r = store.lookupEin("010571515");
+      expect(r).toBeDefined();
+      expect(r!.legalName).toBe("ESTHER MINISTRIES");
+      expect(r!.address).toBe("PO BOX 16774");
+      expect(r!.city).toBe("ENCINO");
+      expect(r!.state).toBe("CA");
+      expect(r!.exemptionType).toBe("03");
+      expect(r!.revocationDate).toBe("15-MAY-2023");
+      expect(r!.postingDate).toBe("14-AUG-2023");
+      expect(r!.reinstatementDate).toBe("");
+
+      // Reinstated org: reinstatementDate should be populated
+      const ri = store.lookupEin("001037180");
+      expect(ri).toBeDefined();
+      expect(ri!.address).toBe("37 BOW ST");
+      expect(ri!.exemptionType).toBe("00");
+      expect(ri!.revocationDate).toBe("15-JUN-2013");
+      expect(ri!.reinstatementDate).toBe("15-JUN-2013");
     });
 
     it("normalizes EIN by stripping dashes and spaces", async () => {

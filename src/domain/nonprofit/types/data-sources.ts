@@ -4,6 +4,7 @@ export interface IrsRevocationRow {
   ein: string;
   legalName: string;
   dba: string;
+  address: string;
   city: string;
   state: string;
   zip: string;
