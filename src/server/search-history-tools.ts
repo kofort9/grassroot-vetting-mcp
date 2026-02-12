@@ -40,7 +40,7 @@ export function getToolDefinitions(): ToolDefinition[] {
         },
       },
       handler: async (args, ctx) => {
-        if (!ctx.searchHistoryReady) {
+        if (!ctx.searchHistoryStore) {
           return formatToolResponse({
             success: false,
             error:
@@ -86,7 +86,7 @@ export function getToolDefinitions(): ToolDefinition[] {
         required: ["search_id"],
       },
       handler: async (args, ctx) => {
-        if (!ctx.searchHistoryReady) {
+        if (!ctx.searchHistoryStore) {
           return formatToolResponse({
             success: false,
             error: "Search history not available.",

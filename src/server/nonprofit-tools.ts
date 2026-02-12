@@ -46,7 +46,7 @@ export function getToolDefinitions(): ToolDefinition[] {
         );
 
         // Log search (non-blocking)
-        if (result.success && result.data && ctx.searchHistoryReady) {
+        if (result.success && result.data && ctx.searchHistoryStore) {
           try {
             ctx.searchHistoryStore.logSearch(
               "search_nonprofit",

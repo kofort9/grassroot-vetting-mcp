@@ -33,14 +33,12 @@ function makeMockCtx(
     ofacClient: {} as ServerContext["ofacClient"],
     courtClient: undefined,
     vettingStore: {} as ServerContext["vettingStore"],
-    vettingStoreReady: true,
     vettingPipeline: {
       runTier1: vi.fn(),
     } as unknown as ServerContext["vettingPipeline"],
     searchHistoryStore: {
       logSearch: vi.fn(),
     } as unknown as ServerContext["searchHistoryStore"],
-    searchHistoryReady: true,
     discoveryIndex: {} as ServerContext["discoveryIndex"],
     discoveryPipeline: {} as ServerContext["discoveryPipeline"],
     discoveryReady: true,

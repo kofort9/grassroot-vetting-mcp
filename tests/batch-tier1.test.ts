@@ -20,6 +20,12 @@ import { checkTier1 } from "../src/domain/nonprofit/tools.js";
 
 const mockedCheckTier1 = vi.mocked(checkTier1);
 
+/** Returns an ISO datetime string N days in the past */
+function daysAgo(n: number): string {
+  const d = new Date(Date.now() - n * 24 * 60 * 60 * 1000);
+  return d.toISOString().replace("T", " ").slice(0, 19);
+}
+
 function makeMockConfig(): VettingPipelineConfig {
   return {
     propublicaClient: {} as VettingPipelineConfig["propublicaClient"],
@@ -32,7 +38,7 @@ function makeMockConfig(): VettingPipelineConfig {
       getLatestByEin: vi.fn().mockReturnValue(null),
       saveResult: vi.fn(),
     } as unknown as VettingPipelineConfig["vettingStore"],
-    vettingStoreReady: true,
+    cacheMaxAgeDays: 30,
   };
 }
 
@@ -85,7 +91,7 @@ describe("batch_tier1 via VettingPipeline", () => {
     (config.vettingStore.getLatestByEin as ReturnType<typeof vi.fn>)
       .mockReturnValueOnce({
         result_json: JSON.stringify(cachedResult),
-        vetted_at: "2026-01-15",
+        vetted_at: daysAgo(3),
         vetted_by: "kofi",
       })
       .mockReturnValueOnce(null);

@@ -19,12 +19,10 @@ export interface ServerContext {
   irsClient: IrsRevocationClient;
   ofacClient: OfacSdnClient;
   courtClient: CourtListenerClient | undefined;
-  vettingStore: VettingStore;
-  vettingStoreReady: boolean;
+  vettingStore: VettingStore | undefined;
   discoveryIndex: DiscoveryIndex;
   vettingPipeline: VettingPipeline;
-  searchHistoryStore: SearchHistoryStore;
-  searchHistoryReady: boolean;
+  searchHistoryStore: SearchHistoryStore | undefined;
   discoveryPipeline: DiscoveryPipeline;
   discoveryReady: boolean;
 }
@@ -49,8 +47,8 @@ export async function createServerContext(): Promise<ServerContext> {
     ? new CourtListenerClient(config.redFlag)
     : undefined;
 
-  const vettingStore = new VettingStore(config.redFlag.dataDir);
-  let vettingStoreReady = false;
+  let vettingStore: VettingStore | undefined;
+  let searchHistoryStore: SearchHistoryStore | undefined;
 
   const discoveryIndex = new DiscoveryIndex(config.discovery);
   const discoveryPipeline = new DiscoveryPipeline(discoveryIndex, portfolioFit);
@@ -69,8 +67,9 @@ export async function createServerContext(): Promise<ServerContext> {
 
   // Initialize vetting result persistence (SQLite)
   try {
-    vettingStore.initialize();
-    vettingStoreReady = true;
+    const store = new VettingStore(config.redFlag.dataDir);
+    store.initialize();
+    vettingStore = store;
   } catch (err) {
     logError(
       "VettingStore initialization failed (persistence disabled):",
@@ -100,12 +99,11 @@ export async function createServerContext(): Promise<ServerContext> {
   }
 
   // Initialize search history logging (shares SQLite db with VettingStore)
-  const searchHistoryStore = new SearchHistoryStore();
-  let searchHistoryReady = false;
-  if (vettingStoreReady) {
+  if (vettingStore) {
     try {
-      searchHistoryStore.initialize(vettingStore.getDatabase());
-      searchHistoryReady = true;
+      const historyStore = new SearchHistoryStore();
+      historyStore.initialize(vettingStore.getDatabase());
+      searchHistoryStore = historyStore;
     } catch (err) {
       logError(
         "SearchHistoryStore initialization failed (search logging disabled):",
@@ -122,7 +120,7 @@ export async function createServerContext(): Promise<ServerContext> {
     ofacClient,
     courtClient,
     vettingStore,
-    vettingStoreReady,
+    cacheMaxAgeDays: config.vettingCacheMaxAgeDays,
   });
 
   return {
@@ -133,10 +131,8 @@ export async function createServerContext(): Promise<ServerContext> {
     ofacClient,
     courtClient,
     vettingStore,
-    vettingStoreReady,
     vettingPipeline,
     searchHistoryStore,
-    searchHistoryReady,
     discoveryIndex,
     discoveryPipeline,
     discoveryReady,

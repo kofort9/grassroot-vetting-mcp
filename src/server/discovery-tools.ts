@@ -98,7 +98,7 @@ export function getToolDefinitions(): ToolDefinition[] {
         );
 
         // Log discovery query (non-blocking)
-        if (result.success && result.data && ctx.searchHistoryReady) {
+        if (result.success && result.data && ctx.searchHistoryStore) {
           try {
             ctx.searchHistoryStore.logSearch(
               "discover_nonprofits",

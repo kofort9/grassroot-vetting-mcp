@@ -50,9 +50,9 @@ export async function startServer(): Promise<void> {
   // Graceful shutdown
   const shutdown = () => {
     logInfo("Shutting down...");
-    ctx.searchHistoryStore.close();
+    ctx.searchHistoryStore?.close();
     ctx.discoveryIndex.close();
-    ctx.vettingStore.close();
+    ctx.vettingStore?.close();
     process.exit(0);
   };
   process.on("SIGINT", shutdown);

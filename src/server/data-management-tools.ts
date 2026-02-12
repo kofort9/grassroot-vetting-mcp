@@ -75,7 +75,7 @@ export function getToolDefinitions(): ToolDefinition[] {
         },
       },
       handler: async (args, ctx) => {
-        if (!ctx.vettingStoreReady) {
+        if (!ctx.vettingStore) {
           return formatToolResponse({
             success: false,
             error:

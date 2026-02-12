@@ -31,6 +31,7 @@ export interface AppConfig {
   thresholds: VettingThresholds;
   portfolioFit: PortfolioFitConfig;
   discovery: DiscoveryIndexConfig;
+  vettingCacheMaxAgeDays: number;
 }
 
 // Security: Only allow official ProPublica API endpoint
@@ -318,5 +319,6 @@ export function loadConfig(): AppConfig {
     thresholds,
     portfolioFit: loadPortfolioFitConfig(),
     discovery: loadDiscoveryConfig(),
+    vettingCacheMaxAgeDays: Math.min(365, Math.max(1, envInt("VETTING_CACHE_MAX_AGE_DAYS", 30))),
   };
 }

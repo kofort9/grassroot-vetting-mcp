@@ -1,30 +1,8 @@
 import axios, { AxiosInstance, AxiosError } from "axios";
 import { RedFlagConfig } from "../../core/config.js";
 import { logDebug, logError, logWarn } from "../../core/logging.js";
+import { RateLimiter } from "../../core/rate-limiter.js";
 import { CourtListenerCase, CourtRecordsResult } from "../nonprofit/types.js";
-
-class RateLimiter {
-  private lastRequestTime = 0;
-  private readonly delayMs: number;
-
-  constructor(delayMs: number) {
-    this.delayMs = delayMs;
-  }
-
-  async waitIfNeeded(): Promise<void> {
-    const now = Date.now();
-    const elapsed = now - this.lastRequestTime;
-
-    if (elapsed < this.delayMs) {
-      const waitTime = this.delayMs - elapsed;
-      logDebug(`Rate limiting: waiting ${waitTime}ms`);
-      await new Promise((resolve) => setTimeout(resolve, waitTime));
-    }
-
-    // Update timestamp AFTER wait completes (not before)
-    this.lastRequestTime = Date.now();
-  }
-}
 
 interface CourtListenerSearchResponse {
   count: number;

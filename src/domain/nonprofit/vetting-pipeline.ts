@@ -19,8 +19,8 @@ export interface VettingPipelineConfig {
   irsClient: IrsRevocationClient;
   ofacClient: OfacSdnClient;
   courtClient?: CourtListenerClient;
-  vettingStore: VettingStore;
-  vettingStoreReady: boolean;
+  vettingStore?: VettingStore;
+  cacheMaxAgeDays: number;
 }
 
 export interface RunTier1Options {
@@ -48,22 +48,34 @@ export class VettingPipeline {
     ein: string,
     opts: RunTier1Options = {},
   ): Promise<Tier1PipelineResult> {
-    const { vettingStore, vettingStoreReady } = this.config;
+    const { vettingStore } = this.config;
 
     // 1. Check cache (unless forceRefresh)
-    if (!opts.forceRefresh && vettingStoreReady) {
+    if (!opts.forceRefresh && vettingStore) {
       const cached = vettingStore.getLatestByEin(ein);
       if (cached) {
-        const cachedResult = JSON.parse(cached.result_json) as Tier1Result;
-        return {
-          response: {
-            success: true,
-            data: cachedResult,
-            attribution: "ProPublica Nonprofit Explorer API",
-          },
-          cached: true,
-          cachedNote: `Previously vetted on ${cached.vetted_at} by ${cached.vetted_by}. Use force_refresh: true to re-vet.`,
-        };
+        const parsedTime = new Date(cached.vetted_at + "Z").getTime();
+        if (!Number.isNaN(parsedTime)) {
+          const ageMs = Date.now() - parsedTime;
+          const ageDays = ageMs / (1000 * 60 * 60 * 24);
+          const maxAge = this.config.cacheMaxAgeDays;
+
+          if (ageDays >= 0 && ageDays <= maxAge) {
+            const cachedResult = JSON.parse(
+              cached.result_json,
+            ) as Tier1Result;
+            return {
+              response: {
+                success: true,
+                data: cachedResult,
+                attribution: "ProPublica Nonprofit Explorer API",
+              },
+              cached: true,
+              cachedNote: `Previously vetted on ${cached.vetted_at} by ${cached.vetted_by} (${Math.floor(ageDays)}d ago, TTL ${maxAge}d). Use force_refresh: true to re-vet.`,
+            };
+          }
+        }
+        // NaN date, future date, or expired cache — fall through to re-vet
       }
     }
 
@@ -88,7 +100,7 @@ export class VettingPipeline {
     );
 
     // 3. Persist result (non-blocking)
-    if (response.success && response.data && vettingStoreReady) {
+    if (response.success && response.data && vettingStore) {
       try {
         vettingStore.saveResult(response.data);
       } catch (err) {

@@ -1,41 +1,13 @@
 import axios, { AxiosInstance, AxiosError } from "axios";
 import { ProPublicaConfig } from "../../core/config.js";
 import { logDebug, logError, logWarn } from "../../core/logging.js";
+import { RateLimiter } from "../../core/rate-limiter.js";
 import {
   ProPublicaSearchResponse,
   ProPublicaOrgDetailResponse,
   ProPublicaOrganization,
   ProPublica990Filing,
 } from "./types.js";
-
-/**
- * Rate limiter that serializes requests via a promise chain.
- * Each call appends to the chain, ensuring only one request
- * executes at a time with the configured delay between them.
- */
-class RateLimiter {
-  private chain: Promise<void> = Promise.resolve();
-  private lastTime = 0;
-  private readonly delayMs: number;
-
-  constructor(delayMs: number) {
-    this.delayMs = delayMs;
-  }
-
-  waitIfNeeded(): Promise<void> {
-    this.chain = this.chain.then(async () => {
-      const now = Date.now();
-      const elapsed = now - this.lastTime;
-      if (elapsed < this.delayMs) {
-        const waitTime = this.delayMs - elapsed;
-        logDebug(`Rate limiting: waiting ${waitTime}ms`);
-        await new Promise<void>((r) => setTimeout(r, waitTime));
-      }
-      this.lastTime = Date.now();
-    });
-    return this.chain;
-  }
-}
 
 /**
  * ProPublica Nonprofit Explorer API client

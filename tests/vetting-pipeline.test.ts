@@ -20,6 +20,12 @@ import { checkTier1 } from "../src/domain/nonprofit/tools.js";
 
 const mockedCheckTier1 = vi.mocked(checkTier1);
 
+/** Returns an ISO datetime string N days in the past */
+function daysAgo(n: number): string {
+  const d = new Date(Date.now() - n * 24 * 60 * 60 * 1000);
+  return d.toISOString().replace("T", " ").slice(0, 19);
+}
+
 function makeMockConfig(
   overrides?: Partial<VettingPipelineConfig>,
 ): VettingPipelineConfig {
@@ -34,7 +40,7 @@ function makeMockConfig(
       getLatestByEin: vi.fn().mockReturnValue(null),
       saveResult: vi.fn(),
     } as unknown as VettingPipelineConfig["vettingStore"],
-    vettingStoreReady: true,
+    cacheMaxAgeDays: 30,
     ...overrides,
   };
 }
@@ -62,13 +68,14 @@ describe("VettingPipeline", () => {
     expect(mockedCheckTier1).toHaveBeenCalledOnce();
   });
 
-  it("returns cached result on cache hit", async () => {
+  it("returns cached result on cache hit (within TTL)", async () => {
     const tier1Result = makeTier1Result({ ein: "12-3456789" });
+    const recentDate = daysAgo(5);
     const config = makeMockConfig({
       vettingStore: {
         getLatestByEin: vi.fn().mockReturnValue({
           result_json: JSON.stringify(tier1Result),
-          vetted_at: "2026-01-15",
+          vetted_at: recentDate,
           vetted_by: "kofi",
         }),
         saveResult: vi.fn(),
@@ -81,8 +88,65 @@ describe("VettingPipeline", () => {
 
     expect(cached).toBe(true);
     expect(response.success).toBe(true);
-    expect(cachedNote).toContain("Previously vetted on 2026-01-15");
+    expect(cachedNote).toContain("Previously vetted on");
+    expect(cachedNote).toContain("TTL 30d");
     expect(mockedCheckTier1).not.toHaveBeenCalled();
+  });
+
+  it("auto-refreshes when cached result exceeds TTL", async () => {
+    const tier1Result = makeTier1Result({ ein: "12-3456789" });
+    mockedCheckTier1.mockResolvedValue({
+      success: true,
+      data: tier1Result,
+      attribution: "ProPublica Nonprofit Explorer API",
+    });
+
+    const staleDate = daysAgo(45); // 45 days old, exceeds 30-day TTL
+    const config = makeMockConfig({
+      vettingStore: {
+        getLatestByEin: vi.fn().mockReturnValue({
+          result_json: JSON.stringify(tier1Result),
+          vetted_at: staleDate,
+          vetted_by: "kofi",
+        }),
+        saveResult: vi.fn(),
+      } as unknown as VettingPipelineConfig["vettingStore"],
+    });
+
+    const pipeline = new VettingPipeline(config);
+    const { cached } = await pipeline.runTier1("12-3456789");
+
+    expect(cached).toBe(false);
+    expect(mockedCheckTier1).toHaveBeenCalledOnce();
+  });
+
+  it("respects custom cacheMaxAgeDays", async () => {
+    const tier1Result = makeTier1Result({ ein: "12-3456789" });
+    mockedCheckTier1.mockResolvedValue({
+      success: true,
+      data: tier1Result,
+      attribution: "ProPublica Nonprofit Explorer API",
+    });
+
+    const date10dAgo = daysAgo(10);
+    const config = makeMockConfig({
+      cacheMaxAgeDays: 7, // 7-day TTL
+      vettingStore: {
+        getLatestByEin: vi.fn().mockReturnValue({
+          result_json: JSON.stringify(tier1Result),
+          vetted_at: date10dAgo,
+          vetted_by: "kofi",
+        }),
+        saveResult: vi.fn(),
+      } as unknown as VettingPipelineConfig["vettingStore"],
+    });
+
+    const pipeline = new VettingPipeline(config);
+    const { cached } = await pipeline.runTier1("12-3456789");
+
+    // 10 days old > 7-day TTL → should re-vet
+    expect(cached).toBe(false);
+    expect(mockedCheckTier1).toHaveBeenCalledOnce();
   });
 
   it("bypasses cache when forceRefresh is true", async () => {
@@ -97,7 +161,7 @@ describe("VettingPipeline", () => {
       vettingStore: {
         getLatestByEin: vi.fn().mockReturnValue({
           result_json: JSON.stringify(tier1Result),
-          vetted_at: "2026-01-15",
+          vetted_at: daysAgo(2), // fresh cache — would normally hit
           vetted_by: "kofi",
         }),
         saveResult: vi.fn(),
@@ -159,7 +223,7 @@ describe("VettingPipeline", () => {
     expect(response.success).toBe(true);
   });
 
-  it("skips cache check when vettingStoreReady is false", async () => {
+  it("skips cache check when vettingStore is undefined", async () => {
     const tier1Result = makeTier1Result();
     mockedCheckTier1.mockResolvedValue({
       success: true,
@@ -167,19 +231,13 @@ describe("VettingPipeline", () => {
       attribution: "ProPublica Nonprofit Explorer API",
     });
 
-    const getLatestByEin = vi.fn();
     const config = makeMockConfig({
-      vettingStoreReady: false,
-      vettingStore: {
-        getLatestByEin,
-        saveResult: vi.fn(),
-      } as unknown as VettingPipelineConfig["vettingStore"],
+      vettingStore: undefined,
     });
 
     const pipeline = new VettingPipeline(config);
     await pipeline.runTier1("12-3456789");
 
-    expect(getLatestByEin).not.toHaveBeenCalled();
     expect(mockedCheckTier1).toHaveBeenCalledOnce();
   });
 });
