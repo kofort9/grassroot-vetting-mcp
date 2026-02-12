@@ -1,4 +1,8 @@
-import type { Tier1Result, RedFlagResult } from "../domain/nonprofit/types.js";
+import type {
+  Tier1Result,
+  RedFlagResult,
+  CourtCaseSummary,
+} from "../domain/nonprofit/types.js";
 
 /**
  * Compact tier1 output — just the decision-relevant fields.
@@ -9,7 +13,12 @@ export interface CompactTier1 {
   recommendation: "PASS" | "REVIEW" | "REJECT";
   score: number | null;
   gate_blocked: boolean;
-  flags: Array<{ severity: string; type: string; detail: string }>;
+  flags: Array<{
+    severity: string;
+    type: string;
+    detail: string;
+    cases?: CourtCaseSummary[];
+  }>;
   next_steps: string[];
 }
 
@@ -20,7 +29,12 @@ export interface CompactRedFlags {
   ein: string;
   name: string;
   clean: boolean;
-  flags: Array<{ severity: string; type: string; detail: string }>;
+  flags: Array<{
+    severity: string;
+    type: string;
+    detail: string;
+    cases?: CourtCaseSummary[];
+  }>;
 }
 
 export function compactTier1(result: Tier1Result): CompactTier1 {
@@ -34,6 +48,7 @@ export function compactTier1(result: Tier1Result): CompactTier1 {
       severity: f.severity,
       type: f.type,
       detail: f.detail,
+      ...(f.cases && { cases: f.cases }),
     })),
     next_steps: result.summary.next_steps,
   };
@@ -48,6 +63,7 @@ export function compactRedFlags(result: RedFlagResult): CompactRedFlags {
       severity: f.severity,
       type: f.type,
       detail: f.detail,
+      ...(f.cases && { cases: f.cases }),
     })),
   };
 }

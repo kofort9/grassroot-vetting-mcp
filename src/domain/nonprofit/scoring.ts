@@ -9,8 +9,119 @@ import {
   VettingThresholds,
   CourtRecordsResult,
   PortfolioFitConfig,
+  CourtCaseSummary,
 } from "./types.js";
 import { generateSummary, generateGateFailureSummary } from "./messages.js";
+
+const COURT_NAMES: Record<string, string> = {
+  scotus: "U.S. Supreme Court",
+  ca1: "1st Circuit",
+  ca2: "2nd Circuit",
+  ca3: "3rd Circuit",
+  ca4: "4th Circuit",
+  ca5: "5th Circuit",
+  ca6: "6th Circuit",
+  ca7: "7th Circuit",
+  ca8: "8th Circuit",
+  ca9: "9th Circuit",
+  ca10: "10th Circuit",
+  ca11: "11th Circuit",
+  cadc: "D.C. Circuit",
+  cafc: "Federal Circuit",
+  dcd: "D.C. District",
+  almd: "M.D. Alabama",
+  alnd: "N.D. Alabama",
+  alsd: "S.D. Alabama",
+  azd: "D. Arizona",
+  ared: "E.D. Arkansas",
+  arwd: "W.D. Arkansas",
+  cacd: "C.D. California",
+  caed: "E.D. California",
+  cand: "N.D. California",
+  casd: "S.D. California",
+  cod: "D. Colorado",
+  ctd: "D. Connecticut",
+  ded: "D. Delaware",
+  flmd: "M.D. Florida",
+  flnd: "N.D. Florida",
+  flsd: "S.D. Florida",
+  gamd: "M.D. Georgia",
+  gand: "N.D. Georgia",
+  gasd: "S.D. Georgia",
+  hid: "D. Hawaii",
+  idd: "D. Idaho",
+  ilcd: "C.D. Illinois",
+  ilnd: "N.D. Illinois",
+  ilsd: "S.D. Illinois",
+  innd: "N.D. Indiana",
+  insd: "S.D. Indiana",
+  iand: "N.D. Iowa",
+  iasd: "S.D. Iowa",
+  ksd: "D. Kansas",
+  kyed: "E.D. Kentucky",
+  kywd: "W.D. Kentucky",
+  laed: "E.D. Louisiana",
+  lamd: "M.D. Louisiana",
+  lawd: "W.D. Louisiana",
+  med: "D. Maine",
+  mdd: "D. Maryland",
+  mad: "D. Massachusetts",
+  mied: "E.D. Michigan",
+  miwd: "W.D. Michigan",
+  mnd: "D. Minnesota",
+  msnd: "N.D. Mississippi",
+  mssd: "S.D. Mississippi",
+  moed: "E.D. Missouri",
+  mowd: "W.D. Missouri",
+  mtd: "D. Montana",
+  ned: "D. Nebraska",
+  nvd: "D. Nevada",
+  nhd: "D. New Hampshire",
+  njd: "D. New Jersey",
+  nmd: "D. New Mexico",
+  nyed: "E.D. New York",
+  nynd: "N.D. New York",
+  nysd: "S.D. New York",
+  nywd: "W.D. New York",
+  nced: "E.D. North Carolina",
+  ncmd: "M.D. North Carolina",
+  ncwd: "W.D. North Carolina",
+  ndd: "D. North Dakota",
+  ohnd: "N.D. Ohio",
+  ohsd: "S.D. Ohio",
+  oked: "E.D. Oklahoma",
+  oknd: "N.D. Oklahoma",
+  okwd: "W.D. Oklahoma",
+  ord: "D. Oregon",
+  paed: "E.D. Pennsylvania",
+  pamd: "M.D. Pennsylvania",
+  pawd: "W.D. Pennsylvania",
+  rid: "D. Rhode Island",
+  scd: "D. South Carolina",
+  sdd: "D. South Dakota",
+  tned: "E.D. Tennessee",
+  tnmd: "M.D. Tennessee",
+  tnwd: "W.D. Tennessee",
+  txed: "E.D. Texas",
+  txnd: "N.D. Texas",
+  txsd: "S.D. Texas",
+  txwd: "W.D. Texas",
+  utd: "D. Utah",
+  vtd: "D. Vermont",
+  vaed: "E.D. Virginia",
+  vawd: "W.D. Virginia",
+  waed: "E.D. Washington",
+  wawd: "W.D. Washington",
+  wvnd: "N.D. West Virginia",
+  wvsd: "S.D. West Virginia",
+  wied: "E.D. Wisconsin",
+  wiwd: "W.D. Wisconsin",
+  wyd: "D. Wyoming",
+};
+
+function resolveCourtName(code: string): string {
+  return COURT_NAMES[code] || code;
+}
 import type { IrsRevocationClient } from "../red-flags/irs-revocation-client.js";
 import type { OfacSdnClient } from "../red-flags/ofac-sdn-client.js";
 import { runPreScreenGates } from "../gates/gate-runner.js";
@@ -378,19 +489,18 @@ export function detectRedFlags(
 
   // Court records (requires CourtListener API result)
   if (courtResult && courtResult.found && courtResult.caseCount > 0) {
-    if (courtResult.caseCount >= 3) {
-      flags.push({
-        severity: "HIGH",
-        type: "court_records",
-        detail: `${courtResult.caseCount} federal court case(s) on record`,
-      });
-    } else {
-      flags.push({
-        severity: "MEDIUM",
-        type: "court_records",
-        detail: `${courtResult.caseCount} federal court case(s) on record`,
-      });
-    }
+    const cases: CourtCaseSummary[] = courtResult.cases.map((c) => ({
+      dateFiled: c.dateFiled,
+      court: resolveCourtName(c.court),
+      url: c.absoluteUrl,
+    }));
+
+    flags.push({
+      severity: courtResult.caseCount >= 3 ? "HIGH" : "MEDIUM",
+      type: "court_records",
+      detail: `${courtResult.caseCount} federal court case(s) on record`,
+      cases,
+    });
   }
 
   return flags;

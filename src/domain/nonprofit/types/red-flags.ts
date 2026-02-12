@@ -12,10 +12,17 @@ export type RedFlagType =
   | "high_officer_compensation"
   | "court_records";
 
+export interface CourtCaseSummary {
+  dateFiled: string | null;
+  court: string;
+  url: string;
+}
+
 export interface RedFlag {
   severity: RedFlagSeverity;
   type: RedFlagType;
   detail: string;
+  cases?: CourtCaseSummary[];
 }
 
 export interface RedFlagResult {

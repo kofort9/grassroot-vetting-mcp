@@ -143,9 +143,10 @@ export class CourtListenerClient {
         dateArgued: d.date_argued,
         dateFiled: d.date_filed,
         docketNumber: d.docket_number || "",
-        absoluteUrl: d.absolute_url
-          ? `https://www.courtlistener.com${d.absolute_url}`
-          : "",
+        absoluteUrl:
+          d.absolute_url && d.absolute_url.startsWith("/")
+            ? `https://www.courtlistener.com${d.absolute_url}`
+            : "",
       }));
 
       return {
