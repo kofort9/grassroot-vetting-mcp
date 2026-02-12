@@ -175,6 +175,7 @@ export function getToolDefinitions(): ToolDefinition[] {
           { ein: argString(args, "ein") },
           ctx.config.thresholds,
           ctx.courtClient,
+          ctx.ofacClient,
         );
 
         if (!verbose && response.data) {

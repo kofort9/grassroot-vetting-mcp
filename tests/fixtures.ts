@@ -245,6 +245,7 @@ export function makeMockStore() {
   return {
     lookupEin: vi.fn().mockReturnValue(undefined),
     lookupName: vi.fn().mockReturnValue([]),
+    fuzzyLookupName: vi.fn().mockReturnValue([]),
     initialize: vi.fn().mockResolvedValue(undefined),
     refresh: vi
       .fn()
@@ -267,6 +268,11 @@ export function makeMockIrsClient() {
 export function makeMockOfacClient() {
   return {
     check: vi.fn().mockReturnValue(makeCleanOfacResult()),
+    fuzzyCheck: vi.fn().mockReturnValue({
+      found: false,
+      detail: "No fuzzy OFAC matches",
+      matches: [],
+    }),
   };
 }
 

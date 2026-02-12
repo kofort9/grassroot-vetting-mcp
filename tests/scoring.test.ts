@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   checkYearsOperating,
   checkRevenueRange,
@@ -656,6 +656,99 @@ describe("detectRedFlags", () => {
     const flags = detectRedFlags(profile, [makeFiling()], t);
     expect(flags).not.toContainEqual(
       expect.objectContaining({ type: "high_officer_compensation" }),
+    );
+  });
+
+  // --- OFAC fuzzy matching ---
+
+  it("flags ofac_near_match as HIGH when similarity >= 0.95", () => {
+    const mockOfacClient = {
+      ...makeMockOfacClient(),
+      fuzzyCheck: vi.fn().mockReturnValue({
+        found: true,
+        detail: '1 near-match(es) on OFAC SDN list',
+        matches: [
+          {
+            entNum: "999",
+            name: "ALMOST IDENTICAL ORG",
+            sdnType: "Entity",
+            program: "SDGT",
+            matchedOn: "primary",
+            similarity: 0.97,
+          },
+        ],
+      }),
+    };
+    const flags = detectRedFlags(
+      makeProfile(),
+      [makeFiling()],
+      t,
+      undefined,
+      mockOfacClient as any,
+    );
+    expect(flags).toContainEqual(
+      expect.objectContaining({ type: "ofac_near_match", severity: "HIGH" }),
+    );
+    expect(flags.find((f) => f.type === "ofac_near_match")!.detail).toContain(
+      "97.0%",
+    );
+  });
+
+  it("flags ofac_near_match as MEDIUM when similarity 0.85-0.95", () => {
+    const mockOfacClient = {
+      ...makeMockOfacClient(),
+      fuzzyCheck: vi.fn().mockReturnValue({
+        found: true,
+        detail: '1 near-match(es) on OFAC SDN list',
+        matches: [
+          {
+            entNum: "999",
+            name: "SOMEWHAT SIMILAR ORG",
+            sdnType: "Entity",
+            program: "SDGT",
+            matchedOn: "primary",
+            similarity: 0.90,
+          },
+        ],
+      }),
+    };
+    const flags = detectRedFlags(
+      makeProfile(),
+      [makeFiling()],
+      t,
+      undefined,
+      mockOfacClient as any,
+    );
+    expect(flags).toContainEqual(
+      expect.objectContaining({ type: "ofac_near_match", severity: "MEDIUM" }),
+    );
+  });
+
+  it("does NOT flag ofac_near_match when fuzzyCheck returns no matches", () => {
+    const mockOfacClient = {
+      ...makeMockOfacClient(),
+      fuzzyCheck: vi.fn().mockReturnValue({
+        found: false,
+        detail: "No fuzzy OFAC matches",
+        matches: [],
+      }),
+    };
+    const flags = detectRedFlags(
+      makeProfile(),
+      [makeFiling()],
+      t,
+      undefined,
+      mockOfacClient as any,
+    );
+    expect(flags).not.toContainEqual(
+      expect.objectContaining({ type: "ofac_near_match" }),
+    );
+  });
+
+  it("does NOT flag ofac_near_match when ofacClient is not provided", () => {
+    const flags = detectRedFlags(makeProfile(), [makeFiling()], t);
+    expect(flags).not.toContainEqual(
+      expect.objectContaining({ type: "ofac_near_match" }),
     );
   });
 

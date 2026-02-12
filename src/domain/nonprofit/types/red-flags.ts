@@ -10,7 +10,8 @@ export type RedFlagType =
   | "revenue_decline"
   | "too_new"
   | "high_officer_compensation"
-  | "court_records";
+  | "court_records"
+  | "ofac_near_match";
 
 export interface CourtCaseSummary {
   dateFiled: string | null;

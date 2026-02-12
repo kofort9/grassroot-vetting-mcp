@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { OfacSdnClient } from "../src/domain/red-flags/ofac-sdn-client.js";
 import { makeOfacRow, makeMockStore } from "./fixtures.js";
 
@@ -53,5 +53,97 @@ describe("OfacSdnClient", () => {
     const { client, store } = makeClient([]);
     client.check("Test Org Inc");
     expect(store.lookupName).toHaveBeenCalledWith("Test Org Inc");
+  });
+});
+
+// ============================================================================
+// fuzzyCheck
+// ============================================================================
+
+describe("OfacSdnClient.fuzzyCheck", () => {
+  function makeFuzzyClient(
+    fuzzyReturn: Array<{
+      normalizedName: string;
+      similarity: number;
+      rows: ReturnType<typeof makeOfacRow>[];
+    }> = [],
+  ) {
+    const store = makeMockStore();
+    store.fuzzyLookupName = vi.fn().mockReturnValue(fuzzyReturn);
+    return { client: new OfacSdnClient(store as any), store };
+  }
+
+  it("returns not found when no near-matches", () => {
+    const { client } = makeFuzzyClient([]);
+    const result = client.fuzzyCheck("Clean Org");
+    expect(result.found).toBe(false);
+    expect(result.matches).toEqual([]);
+  });
+
+  it("returns match with similarity score for Entity-type", () => {
+    const { client } = makeFuzzyClient([
+      {
+        normalizedName: "bad actor foundaton",
+        similarity: 0.92,
+        rows: [makeOfacRow({ sdnType: "Entity" })],
+      },
+    ]);
+    const result = client.fuzzyCheck("Bad Actor Foundation");
+    expect(result.found).toBe(true);
+    expect(result.matches).toHaveLength(1);
+    expect(result.matches[0].similarity).toBe(0.92);
+  });
+
+  it("filters out Individual-type matches (only Entity returned)", () => {
+    const { client } = makeFuzzyClient([
+      {
+        normalizedName: "john doe",
+        similarity: 0.90,
+        rows: [makeOfacRow({ sdnType: "Individual", name: "JOHN DOE" })],
+      },
+    ]);
+    const result = client.fuzzyCheck("John Doe Foundation");
+    expect(result.found).toBe(false);
+    expect(result.detail).toContain("Individual-type");
+  });
+
+  it("uses default threshold of 0.85", () => {
+    const { client, store } = makeFuzzyClient([]);
+    client.fuzzyCheck("Test Org");
+    expect(store.fuzzyLookupName).toHaveBeenCalledWith("Test Org", 0.85);
+  });
+
+  it("accepts custom threshold", () => {
+    const { client, store } = makeFuzzyClient([]);
+    client.fuzzyCheck("Test Org", 0.90);
+    expect(store.fuzzyLookupName).toHaveBeenCalledWith("Test Org", 0.90);
+  });
+
+  it("throws on invalid threshold (> 1.0)", () => {
+    const { client } = makeFuzzyClient([]);
+    expect(() => client.fuzzyCheck("Test Org", 1.5)).toThrow("Invalid OFAC fuzzy threshold");
+  });
+
+  it("throws on invalid threshold (< 0)", () => {
+    const { client } = makeFuzzyClient([]);
+    expect(() => client.fuzzyCheck("Test Org", -0.5)).toThrow("Invalid OFAC fuzzy threshold");
+  });
+
+  it("sorts matches by descending similarity", () => {
+    const { client } = makeFuzzyClient([
+      {
+        normalizedName: "match a",
+        similarity: 0.87,
+        rows: [makeOfacRow({ entNum: "111", sdnType: "Entity", name: "MATCH A" })],
+      },
+      {
+        normalizedName: "match b",
+        similarity: 0.93,
+        rows: [makeOfacRow({ entNum: "222", sdnType: "Entity", name: "MATCH B" })],
+      },
+    ]);
+    const result = client.fuzzyCheck("Something");
+    expect(result.matches[0].similarity).toBe(0.93);
+    expect(result.matches[1].similarity).toBe(0.87);
   });
 });

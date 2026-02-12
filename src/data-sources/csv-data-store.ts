@@ -19,6 +19,7 @@ import {
   DataManifest,
 } from "../domain/nonprofit/types.js";
 import { normalizeName } from "./name-normalizer.js";
+import { jaroWinkler } from "./jaro-winkler.js";
 
 const IRS_REVOCATION_URL =
   "https://apps.irs.gov/pub/epostcard/data-download-revocation.zip";
@@ -130,6 +131,35 @@ export class CsvDataStore {
   lookupName(name: string): OfacSdnRow[] {
     const normalized = normalizeName(name);
     return this.ofacNameMap.get(normalized) || [];
+  }
+
+  fuzzyLookupName(
+    name: string,
+    threshold: number,
+  ): Array<{ normalizedName: string; similarity: number; rows: OfacSdnRow[] }> {
+    let normalized = normalizeName(name);
+    if (!normalized) return [];
+
+    // Cap length to prevent adversarial long inputs from causing O(L*N) blowup
+    if (normalized.length > 200) {
+      normalized = normalized.substring(0, 200);
+    }
+
+    const matches: Array<{
+      normalizedName: string;
+      similarity: number;
+      rows: OfacSdnRow[];
+    }> = [];
+
+    for (const [key, rows] of this.ofacNameMap) {
+      if (key === normalized) continue; // exact matches handled by gate
+      const score = jaroWinkler(normalized, key);
+      if (score >= threshold) {
+        matches.push({ normalizedName: key, similarity: score, rows });
+      }
+    }
+
+    return matches.sort((a, b) => b.similarity - a.similarity).slice(0, 5);
   }
 
   private async downloadAndParseIrs(manifest: DataManifest): Promise<void> {

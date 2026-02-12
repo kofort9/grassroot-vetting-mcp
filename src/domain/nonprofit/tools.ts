@@ -295,6 +295,7 @@ export async function getRedFlags(
   input: GetRedFlagsInput,
   thresholds: VettingThresholds,
   courtClient?: CourtListenerClient,
+  ofacClient?: OfacSdnClient,
 ): Promise<ToolResponse<RedFlagResult>> {
   return withEinLookup(
     client,
@@ -317,6 +318,7 @@ export async function getRedFlags(
         filings,
         resolveThresholds(thresholds, profile.ntee_code),
         courtResult,
+        ofacClient,
       );
     },
   );

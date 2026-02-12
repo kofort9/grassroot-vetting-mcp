@@ -57,6 +57,16 @@ export interface OfacSanctionsResult {
   matches: OfacMatch[];
 }
 
+export interface OfacFuzzyMatch extends OfacMatch {
+  similarity: number;
+}
+
+export interface OfacFuzzyResult {
+  found: boolean;
+  detail: string;
+  matches: OfacFuzzyMatch[];
+}
+
 // CourtListener Types
 
 export interface CourtListenerCase {

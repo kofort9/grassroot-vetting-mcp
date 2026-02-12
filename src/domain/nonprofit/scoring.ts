@@ -376,6 +376,7 @@ export function detectRedFlags(
   filings: ProPublica990Filing[] | undefined,
   t: VettingThresholds,
   courtResult?: CourtRecordsResult,
+  ofacClient?: OfacSdnClient,
 ): RedFlag[] {
   const flags: RedFlag[] = [];
 
@@ -503,6 +504,19 @@ export function detectRedFlags(
     });
   }
 
+  // OFAC fuzzy matching (near-match detection)
+  if (ofacClient) {
+    const fuzzyResult = ofacClient.fuzzyCheck(profile.name);
+    if (fuzzyResult.found) {
+      const best = fuzzyResult.matches[0];
+      flags.push({
+        severity: best.similarity >= 0.95 ? "HIGH" : "MEDIUM",
+        type: "ofac_near_match",
+        detail: `Possible OFAC near-match: "${best.name}" (${(best.similarity * 100).toFixed(1)}% similar)`,
+      });
+    }
+  }
+
   return flags;
 }
 
@@ -584,7 +598,7 @@ export function runTier1Checks(
   const { checks, score } = runScoringChecks(profile, t);
 
   // Layer 3: Red flag overlay
-  const redFlags = detectRedFlags(profile, filings, t, courtResult);
+  const redFlags = detectRedFlags(profile, filings, t, courtResult, ofacClient);
 
   // Determine recommendation
   const recommendation = getRecommendation(score, redFlags, t);
@@ -626,8 +640,9 @@ export function runRedFlagCheck(
   filings: ProPublica990Filing[] | undefined,
   t: VettingThresholds,
   courtResult?: CourtRecordsResult,
+  ofacClient?: OfacSdnClient,
 ): RedFlagResult {
-  const flags = detectRedFlags(profile, filings, t, courtResult);
+  const flags = detectRedFlags(profile, filings, t, courtResult, ofacClient);
 
   return {
     ein: profile.ein,
