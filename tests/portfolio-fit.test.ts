@@ -70,22 +70,32 @@ describe("Gate 4: checkPortfolioFit", () => {
     expect(result.detail).toContain("outside portfolio scope");
   });
 
-  // ---- No NTEE code ----
+  // ---- No NTEE code (unclassified orgs pass through) ----
 
-  it("returns FAIL for org with empty NTEE code", () => {
+  it("returns PASS for org with empty NTEE code (unclassified)", () => {
     const config = makePortfolioFitConfig();
     const profile = makeProfile({ ntee_code: "" });
     const result = checkPortfolioFit(profile, config);
-    expect(result.verdict).toBe("FAIL");
-    expect(result.detail).toContain("No NTEE classification");
+    expect(result.verdict).toBe("PASS");
+    expect(result.detail).toContain("NTEE classification missing");
+    expect(result.detail).toContain("unverified");
   });
 
-  it("returns FAIL for org with undefined NTEE code (null coercion)", () => {
+  it("returns PASS for org with undefined NTEE code (null coercion)", () => {
     const config = makePortfolioFitConfig();
     const profile = makeProfile({ ntee_code: undefined as any });
     const result = checkPortfolioFit(profile, config);
-    expect(result.verdict).toBe("FAIL");
-    expect(result.detail).toContain("No NTEE classification");
+    expect(result.verdict).toBe("PASS");
+    expect(result.detail).toContain("NTEE classification missing");
+  });
+
+  it("sub-check shows passed=true for missing NTEE (not a failure)", () => {
+    const config = makePortfolioFitConfig();
+    const profile = makeProfile({ ntee_code: "" });
+    const result = checkPortfolioFit(profile, config);
+    const nteeSub = result.sub_checks!.find((s) => s.label === "NTEE category match");
+    expect(nteeSub!.passed).toBe(true);
+    expect(nteeSub!.detail).toContain("unclassified");
   });
 
   // ---- EIN exclusion list ----

@@ -53,7 +53,7 @@ export function matchesPortfolioFit(
 
   // NTEE category match
   if (!nteeCode) {
-    return { passes: false, reason: "No NTEE classification on file" };
+    return { passes: true, reason: "NTEE classification missing — portfolio fit unverified" };
   }
 
   if (matchesNteeCategory(nteeCode, config.allowedNteeCategories)) {

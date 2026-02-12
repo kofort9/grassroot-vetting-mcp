@@ -52,15 +52,16 @@ export function checkPortfolioFit(
   const nteeMatched = nteeCode
     ? matchesNteeCategory(nteeCode, config.allowedNteeCategories)
     : false;
+  const nteeMissing = !nteeCode;
 
   subChecks.push({
     label: "NTEE category match",
-    passed: nteeMatched,
+    passed: nteeMatched || nteeMissing,
     detail: nteeMatched
       ? `NTEE code ${nteeCode} matches allowed categories`
-      : nteeCode
-        ? `NTEE category ${nteeCode} is outside portfolio scope`
-        : "No NTEE classification on file",
+      : nteeMissing
+        ? "No NTEE code on file (unclassified)"
+        : `NTEE category ${nteeCode} is outside portfolio scope`,
   });
 
   // Disabled gate = automatic pass (sub-checks still recorded for auditability)
@@ -88,8 +89,8 @@ export function checkPortfolioFit(
     verdict = "PASS";
     detail = "Included by platform override";
   } else if (!nteeCode) {
-    verdict = "FAIL";
-    detail = "No NTEE classification on file";
+    verdict = "PASS";
+    detail = "NTEE classification missing — portfolio fit unverified";
   } else if (nteeMatched) {
     verdict = "PASS";
     detail = `NTEE code ${nteeCode} is within portfolio scope`;
