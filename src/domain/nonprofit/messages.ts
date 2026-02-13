@@ -62,7 +62,7 @@ export const CHECK_MESSAGES: Record<
   },
   revenue_range: {
     PASS: {
-      factor: "Revenue in target range ($50K-$10M)",
+      factor: "Revenue in target range",
       weight: "positive",
     },
     REVIEW: { factor: "Revenue outside ideal range", weight: "neutral" },

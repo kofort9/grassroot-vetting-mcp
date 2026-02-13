@@ -43,40 +43,40 @@ export interface VettingThresholds {
   weightRecent990: number;
 
   // Years operating
-  yearsPassMin: number; // >= this = PASS (default: 3)
-  yearsReviewMin: number; // >= this = REVIEW (default: 1)
+  yearsPassMin: number; // >= this = PASS
+  yearsReviewMin: number; // >= this = REVIEW
 
-  // Revenue range ($)
-  revenueFailMin: number; // < this = FAIL (default: 50000)
-  revenuePassMin: number; // >= this = PASS lower bound (default: 100000)
-  revenuePassMax: number; // <= this = PASS upper bound (default: 10000000)
-  revenueReviewMax: number; // <= this = REVIEW upper bound (default: 50000000)
+  // Revenue range ($) — defaults in config.ts loadThresholds()
+  revenueFailMin: number; // < this = FAIL
+  revenuePassMin: number; // >= this = PASS lower bound
+  revenuePassMax: number; // <= this = PASS upper bound
+  revenueReviewMax: number; // <= this = REVIEW upper bound
 
   // Expense-to-revenue ratio
-  expenseRatioPassMin: number; // lower bound of healthy range (default: 0.70)
-  expenseRatioPassMax: number; // upper bound of healthy range (default: 1.0)
-  expenseRatioHighReview: number; // above passMax, up to this = REVIEW (default: 1.2)
-  expenseRatioLowReview: number; // below passMin, down to this = REVIEW (default: 0.5)
+  expenseRatioPassMin: number; // lower bound of healthy range
+  expenseRatioPassMax: number; // upper bound of healthy range
+  expenseRatioHighReview: number; // above passMax, up to this = REVIEW
+  expenseRatioLowReview: number; // below passMin, down to this = REVIEW
 
   // 990 filing recency (years)
-  filing990PassMax: number; // <= this = PASS (default: 2)
-  filing990ReviewMax: number; // <= this = REVIEW (default: 3)
+  filing990PassMax: number; // <= this = PASS
+  filing990ReviewMax: number; // <= this = REVIEW
 
   // Score-based recommendation cutoffs
-  scorePassMin: number; // >= this = PASS (default: 75)
-  scoreReviewMin: number; // >= this = REVIEW (default: 50)
+  scorePassMin: number; // >= this = PASS
+  scoreReviewMin: number; // >= this = REVIEW
 
   // Red flag thresholds
-  redFlagStale990Years: number; // 990 older than this = HIGH flag (default: 4)
-  redFlagHighExpenseRatio: number; // above this = HIGH flag (default: 1.2)
-  redFlagLowExpenseRatio: number; // below this = MEDIUM flag (default: 0.5)
-  redFlagVeryLowRevenue: number; // below this = MEDIUM flag (default: 25000)
-  redFlagRevenueDeclinePercent: number; // decline > this = MEDIUM flag (default: 0.2)
-  redFlagTooNewYears: number; // operating < this = MEDIUM flag (default: 1)
+  redFlagStale990Years: number; // 990 older than this = HIGH flag
+  redFlagHighExpenseRatio: number; // above this = HIGH flag
+  redFlagLowExpenseRatio: number; // below this = MEDIUM flag
+  redFlagVeryLowRevenue: number; // below this = MEDIUM flag
+  redFlagRevenueDeclinePercent: number; // decline > this = MEDIUM flag
+  redFlagTooNewYears: number; // operating < this = MEDIUM flag
 
   // Officer compensation thresholds (decimal: 0.40 = 40%)
-  redFlagHighCompensation: number; // above this = HIGH flag (default: 0.40)
-  redFlagModerateCompensation: number; // above this = MEDIUM flag (default: 0.25)
+  redFlagHighCompensation: number; // above this = HIGH flag
+  redFlagModerateCompensation: number; // above this = MEDIUM flag
 }
 
 // Portfolio-Fit Config (Platform Eligibility Policy)

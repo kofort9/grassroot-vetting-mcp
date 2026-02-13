@@ -33,27 +33,37 @@ const SECTOR_OVERRIDES: Record<string, Partial<VettingThresholds>> = {
 
   // K = Food, Agriculture, and Nutrition
   K: {
+    revenueFailMin: 10_000,
     revenuePassMin: 25_000,
+    redFlagVeryLowRevenue: 8_000,
   },
 
   // L = Housing, Shelter
   L: {
+    revenueFailMin: 15_000,
     revenuePassMin: 30_000,
+    redFlagVeryLowRevenue: 10_000,
   },
 
   // O = Youth Development
   O: {
+    revenueFailMin: 10_000,
     revenuePassMin: 25_000,
+    redFlagVeryLowRevenue: 8_000,
   },
 
   // P = Human Services
   P: {
+    revenueFailMin: 15_000,
     revenuePassMin: 30_000,
+    redFlagVeryLowRevenue: 10_000,
   },
 
   // S = Community Improvement, Capacity Building
   S: {
+    revenueFailMin: 10_000,
     revenuePassMin: 25_000,
+    redFlagVeryLowRevenue: 8_000,
   },
 };
 

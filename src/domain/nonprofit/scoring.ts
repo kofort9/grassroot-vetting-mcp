@@ -117,7 +117,7 @@ export function checkRevenueRange(
  *
  * Instead, we check Expense-to-Revenue ratio using configurable bands.
  */
-export function checkOverheadRatio(
+export function checkSpendRate(
   profile: NonprofitProfile,
   t: VettingThresholds,
 ): Tier1Check {
@@ -328,15 +328,15 @@ export function detectRedFlags(
     // Officer compensation ratio — size-tiered thresholds
     const compRatio = profile.latest_990.officer_compensation_ratio;
     if (compRatio != null && Number.isFinite(compRatio) && compRatio > 0) {
-      const revenue = profile.latest_990.total_revenue ?? 0;
+      const revenueForTier = profile.latest_990.total_revenue ?? 0;
 
-      // Determine size-tier thresholds
+      // Determine size-tier thresholds (small orgs get more lenient comp limits)
       let highThreshold: number;
       let moderateThreshold: number;
-      if (revenue < 250_000) {
+      if (revenueForTier < 250_000) {
         highThreshold = 0.6;
         moderateThreshold = 0.4;
-      } else if (revenue < 1_000_000) {
+      } else if (revenueForTier < 1_000_000) {
         highThreshold = 0.5;
         moderateThreshold = 0.3;
       } else {
@@ -344,7 +344,7 @@ export function detectRedFlags(
         moderateThreshold = t.redFlagModerateCompensation;
       }
 
-      // Sector overrides: max(sector_threshold, size_tier_threshold) wins
+      // Ensure size-tier thresholds never drop below resolved base/sector thresholds
       highThreshold = Math.max(highThreshold, t.redFlagHighCompensation);
       moderateThreshold = Math.max(moderateThreshold, t.redFlagModerateCompensation);
 
@@ -446,7 +446,7 @@ export function runScoringChecks(
   const checks: Tier1Check[] = [
     checkYearsOperating(profile, t),
     checkRevenueRange(profile, t),
-    checkOverheadRatio(profile, t),
+    checkSpendRate(profile, t),
     checkRecent990(profile, t),
   ];
 

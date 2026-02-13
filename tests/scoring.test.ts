@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   checkYearsOperating,
   checkRevenueRange,
-  checkOverheadRatio,
+  checkSpendRate,
   checkRecent990,
   calculateScore,
   getRecommendation,
@@ -121,10 +121,10 @@ describe("checkRevenueRange", () => {
 });
 
 // ============================================================================
-// checkOverheadRatio
+// checkSpendRate
 // ============================================================================
 
-describe("checkOverheadRatio", () => {
+describe("checkSpendRate", () => {
   it.each([
     [0.8, "PASS"], // healthy
     [0.7, "PASS"], // within range
@@ -141,7 +141,7 @@ describe("checkOverheadRatio", () => {
     [-0.5, "FAIL"], // data anomaly
     [1.6, "FAIL"], // above high review (> 1.5)
   ] as const)("ratio %d → %s", (ratio, expected) => {
-    const result = checkOverheadRatio(
+    const result = checkSpendRate(
       makeProfile({ latest_990: make990({ overhead_ratio: ratio }) }),
       t,
     );
@@ -149,7 +149,7 @@ describe("checkOverheadRatio", () => {
   });
 
   it("reviews for null ratio (missing data)", () => {
-    const result = checkOverheadRatio(
+    const result = checkSpendRate(
       makeProfile({ latest_990: make990({ overhead_ratio: null }) }),
       t,
     );
@@ -158,12 +158,12 @@ describe("checkOverheadRatio", () => {
   });
 
   it("reviews when no 990 at all", () => {
-    const result = checkOverheadRatio(makeProfile({ latest_990: null }), t);
+    const result = checkSpendRate(makeProfile({ latest_990: null }), t);
     expect(result.result).toBe("REVIEW");
   });
 
   it("fails for negative ratio with data anomaly message", () => {
-    const result = checkOverheadRatio(
+    const result = checkSpendRate(
       makeProfile({ latest_990: make990({ overhead_ratio: -0.5 }) }),
       t,
     );
@@ -173,7 +173,7 @@ describe("checkOverheadRatio", () => {
   });
 
   it("returns spend_rate as check name", () => {
-    const result = checkOverheadRatio(makeProfile(), t);
+    const result = checkSpendRate(makeProfile(), t);
     expect(result.name).toBe("spend_rate");
   });
 });
@@ -1107,10 +1107,11 @@ describe("resolveThresholds", () => {
     expect(resolved).toEqual(t);
   });
 
-  it("lowers revenuePassMin for K (Food/Agriculture)", () => {
+  it("lowers revenuePassMin and revenueFailMin for K (Food/Agriculture)", () => {
     const resolved = resolveThresholds(t, "K31");
     expect(resolved.revenuePassMin).toBe(25_000);
-    expect(resolved.revenueFailMin).toBe(t.revenueFailMin);
+    expect(resolved.revenueFailMin).toBe(10_000);
+    expect(resolved.redFlagVeryLowRevenue).toBe(8_000);
   });
 
   it("overrides only redFlagVeryLowRevenue for A (Arts)", () => {
@@ -1145,28 +1146,32 @@ describe("resolveThresholds", () => {
     }
   });
 
-  it("lowers revenuePassMin for L (Housing)", () => {
+  it("lowers revenuePassMin and revenueFailMin for L (Housing)", () => {
     const resolved = resolveThresholds(t, "L21");
     expect(resolved.revenuePassMin).toBe(30_000);
-    expect(resolved.revenueFailMin).toBe(t.revenueFailMin);
+    expect(resolved.revenueFailMin).toBe(15_000);
+    expect(resolved.redFlagVeryLowRevenue).toBe(10_000);
   });
 
-  it("lowers revenuePassMin for O (Youth Development)", () => {
+  it("lowers revenuePassMin and revenueFailMin for O (Youth Development)", () => {
     const resolved = resolveThresholds(t, "O50");
     expect(resolved.revenuePassMin).toBe(25_000);
-    expect(resolved.revenueFailMin).toBe(t.revenueFailMin);
+    expect(resolved.revenueFailMin).toBe(10_000);
+    expect(resolved.redFlagVeryLowRevenue).toBe(8_000);
   });
 
-  it("lowers revenuePassMin for P (Human Services)", () => {
+  it("lowers revenuePassMin and revenueFailMin for P (Human Services)", () => {
     const resolved = resolveThresholds(t, "P70");
     expect(resolved.revenuePassMin).toBe(30_000);
-    expect(resolved.revenueFailMin).toBe(t.revenueFailMin);
+    expect(resolved.revenueFailMin).toBe(15_000);
+    expect(resolved.redFlagVeryLowRevenue).toBe(10_000);
   });
 
-  it("lowers revenuePassMin for S (Community Improvement)", () => {
+  it("lowers revenuePassMin and revenueFailMin for S (Community Improvement)", () => {
     const resolved = resolveThresholds(t, "S20");
     expect(resolved.revenuePassMin).toBe(25_000);
-    expect(resolved.revenueFailMin).toBe(t.revenueFailMin);
+    expect(resolved.revenueFailMin).toBe(10_000);
+    expect(resolved.redFlagVeryLowRevenue).toBe(8_000);
   });
 
   it("reports supported sectors", () => {
@@ -1240,6 +1245,63 @@ describe("resolveThresholds", () => {
         type: "high_officer_compensation",
         severity: "MEDIUM",
       }),
+    );
+  });
+
+  // Boundary tests: REVIEW band preserved by revenueFailMin overrides
+
+  it("K sector: org at exactly $10K FAILS (at revenueFailMin boundary)", () => {
+    const profile = makeProfile({
+      ntee_code: "K31",
+      latest_990: make990({ total_revenue: 10_000 }),
+    });
+    const resolved = resolveThresholds(t, "K31");
+    // $10K >= revenueFailMin ($10K) but < revenuePassMin ($25K) → REVIEW
+    const check = checkRevenueRange(profile, resolved);
+    expect(check.result).toBe("REVIEW");
+  });
+
+  it("K sector: org at $9,999 FAILS (below revenueFailMin)", () => {
+    const profile = makeProfile({
+      ntee_code: "K31",
+      latest_990: make990({ total_revenue: 9_999 }),
+    });
+    const resolved = resolveThresholds(t, "K31");
+    const check = checkRevenueRange(profile, resolved);
+    expect(check.result).toBe("FAIL");
+  });
+
+  it("K sector: org at $25K PASSES (at revenuePassMin boundary)", () => {
+    const profile = makeProfile({
+      ntee_code: "K31",
+      latest_990: make990({ total_revenue: 25_000 }),
+    });
+    const resolved = resolveThresholds(t, "K31");
+    const check = checkRevenueRange(profile, resolved);
+    expect(check.result).toBe("PASS");
+  });
+
+  it("K sector: $15K org has REVIEW band (not cliff)", () => {
+    const profile = makeProfile({
+      ntee_code: "K31",
+      latest_990: make990({ total_revenue: 15_000 }),
+    });
+    const resolved = resolveThresholds(t, "K31");
+    const check = checkRevenueRange(profile, resolved);
+    // $15K is between failMin ($10K) and passMin ($25K) → REVIEW
+    expect(check.result).toBe("REVIEW");
+  });
+
+  it("K sector: $12K org does NOT get contradictory very_low_revenue flag", () => {
+    const profile = makeProfile({
+      ntee_code: "K31",
+      latest_990: make990({ total_revenue: 12_000 }),
+    });
+    const resolved = resolveThresholds(t, "K31");
+    const flags = detectRedFlags(profile, [makeFiling()], resolved);
+    // $12K > redFlagVeryLowRevenue ($8K) → no very_low_revenue flag
+    expect(flags).not.toContainEqual(
+      expect.objectContaining({ type: "very_low_revenue" }),
     );
   });
 });
