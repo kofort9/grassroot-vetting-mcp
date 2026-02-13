@@ -27,13 +27,22 @@ Most legitimate nonprofits pass all three gates. Gate failures catch orgs that h
 
 ### Layer 2: Scoring Engine
 
-Four checks, each worth 25 points (100 total). Each check produces one of three results:
+Four checks with weighted scoring (100 total). Weights reflect signal strength: spend rate and 990 recency carry more weight because they're stronger indicators of organizational health.
 
-* **PASS** → full 25 points
-* **REVIEW** → half marks (12.5 points, rounded)
+| Check | Weight |
+| -- | -- |
+| Years Operating | 10 |
+| Revenue Range | 25 |
+| Spend Rate | 35 |
+| 990 Recency | 30 |
+
+Each check produces one of three results:
+
+* **PASS** → full points for that check's weight
+* **REVIEW** → half marks (rounded)
 * **FAIL** → 0 points
 
-The total across all four checks determines the recommendation. This means the system produces 9 distinct possible scores: 0, 13, 25, 38, 50, 63, 75, 88, 100.
+The total across all four checks determines the recommendation.
 
 | Check | What It Measures | PASS | REVIEW | FAIL | Data Source |
 | -- | -- | -- | -- | -- | -- |
@@ -67,8 +76,8 @@ The "Very Low Revenue" column sets the threshold for the red flag — it's alway
 
 * **Revenue floor ($25K base fail / $50K base full marks):** We chose a low floor because Bonsaei's directory targets grassroots and community orgs. A $30K org can be legitimate and effective — especially mutual aid, mentorship, or volunteer-driven programs. The $25K floor filters out dormant shell orgs while keeping small active ones. Sector-specific floors go as low as $10K for food/agriculture and youth development. We expect to adjust these based on manual review outcomes.
 * **Spend rate (60–130%):** The wide range accommodates different operating models. Below 60% signals an org that isn't deploying funds. Above 130% means spending significantly more than annual revenue — normal for pass-through orgs like food banks that distribute donated goods (which count as expenses but not revenue), but a sustainability concern for others. We chose these bounds after reviewing sector norms in ProPublica data; the range will narrow as we gather more review data.
-* **Score thresholds (75 = PASS, 50 = REVIEW):** We set 75 so that an org can fail one check entirely and still pass (3 × 25 = 75). This is a design choice, not an empirical finding — the gate layer handles hard disqualifiers, so the scoring layer can tolerate one weak area. 50 means failing two checks entirely puts you in REJECT territory. We expect to validate these cutoffs against manual review decisions.
-* **Equal weighting (25/25/25/25):** All four checks carry the same weight. This is a starting assumption — we don't yet have data to say which checks are most predictive of real-world org quality. After ~300 manual reviews, we plan to run a regression against review outcomes and reweight accordingly. Our hypothesis is that spend rate and 990 recency will prove more predictive than years operating.
+* **Score thresholds (75 = PASS, 50 = REVIEW):** 75 means an org can fail Years Operating (10 pts) or Revenue Range (25 pts) entirely and still pass. Failing Spend Rate (35 pts, score=65) or 990 Recency (30 pts, score=70) drops to REVIEW — intentional, since these are stronger signals. 50 means failing two checks entirely puts you in REJECT territory. We expect to validate these cutoffs against manual review decisions.
+* **Weighted scoring (10/25/35/30):** Spend rate and 990 recency carry more weight because they are stronger signals of organizational health. Years operating is the weakest signal — longevity doesn't guarantee quality, and a 30-year-old org with terrible financials shouldn't coast on age. Revenue range stays at 25 as a core eligibility check. After ~300 manual reviews, we plan to run a logistic regression to validate or further refine these weights.
 
 **Score → Recommendation:**
 
@@ -78,7 +87,16 @@ The "Very Low Revenue" column sets the threshold for the red flag — it's alway
 | 50–74 | **REVIEW** — needs manual review |
 | 0–49 | **REJECT** |
 
-An org that aces 3 checks but fails 1 entirely still scores 75 → PASS. The gates handle hard disqualifiers; scoring is more forgiving on gradient measures.
+Impact of failing a single check entirely:
+
+| Failed Check | Score | Result |
+| -- | -- | -- |
+| Years Operating (10 pts) | 90 | PASS |
+| Revenue Range (25 pts) | 75 | PASS |
+| Spend Rate (35 pts) | 65 | REVIEW |
+| 990 Recency (30 pts) | 70 | REVIEW |
+
+Failing the two strongest signals (Spend Rate, 990 Recency) correctly triggers human review. The gates handle hard disqualifiers; scoring is more forgiving on gradient measures.
 
 ### Layer 3: Red Flag Overlay
 
@@ -140,7 +158,7 @@ Net effect: the pipeline is more likely to surface small, well-run orgs for the 
 These are accepted trade-offs for V1, not bugs:
 
 1. **All scoring data is self-reported** — Every scoring check and most red flags derive from a single source: the IRS Form 990, which is filed by the nonprofit itself. There is no independent verification of financial figures. The IRS rarely audits small nonprofits, so a bad actor who maintains filing compliance for 3+ years and reports plausible numbers can produce any desired score. This is the fundamental limitation of Tier 1 automation — it filters out obviously problematic orgs, but cannot catch sophisticated fraud. That is what Tier 2 (manual review, external data sources) is for.
-2. **Equal weighting (25/25/25/25)** — All four scoring checks are weighted the same. This is a calibration starting point, not a design conviction. After ~300 manual reviews, we will run a logistic regression of review outcomes against check scores to determine if non-equal weights improve classification accuracy. Our hypothesis: spend rate and 990 recency will carry more weight than years operating.
+2. **Weight calibration (10/25/35/30)** — Check weights are based on signal-strength reasoning, not empirical data. Spend rate (35) and 990 recency (30) are weighted highest because they most directly indicate financial health and data confidence. After ~300 manual reviews, we will run a logistic regression of review outcomes against check scores to validate or refine these weights.
 3. **Spend rate ≠ true overhead** — ProPublica reports total functional expenses vs. total revenue. It doesn't separate program expenses from admin/fundraising. A high spend rate could mean great program delivery or bloated overhead — we can't tell from 990 summary data alone. Note: within the 60–130% pass band, all spend rates earn the same score — a 65% ratio and a 125% ratio both get full marks.
 4. **NTEE codes are approximate** — IRS NTEE classification codes are ~15-20% miscoded in practice (source: IRS classification via ProPublica, no independent verification). The cause area filter in the directory is useful but not authoritative. Sector-adjusted thresholds inherit this limitation — an org miscoded into the wrong NTEE category gets the wrong sector override.
 5. **No officer-level sanctions check** — We check org names against OFAC but not individual officers, because ProPublica doesn't expose officer names in its API.
@@ -165,7 +183,7 @@ Every rejection cites a specific source (IRS list, court docket, ProPublica data
 
 ## Test Coverage
 
-The scoring engine has **508 automated tests** covering gates, scoring, red flags, sector-adjusted thresholds, and boundary conditions across all four metro regions.
+The scoring engine has **512 automated tests** covering gates, scoring, red flags, sector-adjusted thresholds, and boundary conditions across all four metro regions.
 
 ---
 
@@ -193,4 +211,4 @@ These are design decisions surfaced during review that need resolution. They are
 
 10. **Missing NTEE code handling** — Orgs with no NTEE code on file currently bypass the portfolio fit gate entirely (auto-pass). Should this instead flag for review?
 
-*Last updated: 2026-02-12 — accuracy pass (doc now matches code behavior), open questions added.*
+*Last updated: 2026-02-12 — reweighted scoring checks (10/25/35/30), updated score impact tables and known limitations.*

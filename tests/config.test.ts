@@ -13,24 +13,24 @@ describe("validateThresholds", () => {
   // --- Weight validation ---
 
   it("rejects weights that do not sum to 100", () => {
-    const t = makeThresholds({ weightYearsOperating: 50 }); // sum = 125
+    const t = makeThresholds({ weightYearsOperating: 50 }); // sum = 140
     expect(() => validateThresholds(t)).toThrow(/Weights must sum to 100/);
   });
 
   it("rejects negative weights", () => {
-    // Keep sum at 100 but with a negative: -10 + 60 + 25 + 25 = 100
+    // Keep sum at 100 but with a negative: -10 + 45 + 35 + 30 = 100
     const t = makeThresholds({
       weightYearsOperating: -10,
-      weightRevenueRange: 60,
+      weightRevenueRange: 45,
     });
     expect(() => validateThresholds(t)).toThrow(/non-negative/);
   });
 
   it("accepts zero weight (disabling a check)", () => {
-    // sum still 100: 0 + 50 + 25 + 25 = 100
+    // sum still 100: 0 + 35 + 35 + 30 = 100
     const t = makeThresholds({
       weightYearsOperating: 0,
-      weightRevenueRange: 50,
+      weightRevenueRange: 35,
     });
     expect(() => validateThresholds(t)).not.toThrow();
   });

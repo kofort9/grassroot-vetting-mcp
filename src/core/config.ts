@@ -76,11 +76,11 @@ export function loadProPublicaConfig(): ProPublicaConfig {
  */
 export function loadThresholds(): VettingThresholds {
   return {
-    // Check weights (4 checks x 25 = 100; 501c3 moved to gate layer)
-    weightYearsOperating: envInt("VETTING_WEIGHT_YEARS", 25),
+    // Check weights (10+25+35+30 = 100; 501c3 moved to gate layer)
+    weightYearsOperating: envInt("VETTING_WEIGHT_YEARS", 10),
     weightRevenueRange: envInt("VETTING_WEIGHT_REVENUE", 25),
-    weightSpendRate: envInt("VETTING_WEIGHT_OVERHEAD", 25),
-    weightRecent990: envInt("VETTING_WEIGHT_990", 25),
+    weightSpendRate: envInt("VETTING_WEIGHT_OVERHEAD", 35),
+    weightRecent990: envInt("VETTING_WEIGHT_990", 30),
 
     // Years operating
     yearsPassMin: envInt("VETTING_YEARS_PASS_MIN", 3),

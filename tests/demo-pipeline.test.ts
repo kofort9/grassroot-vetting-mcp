@@ -3,7 +3,7 @@
  *
  * Shows the 3-layer architecture in action:
  *   Layer 1: Gates (binary pre-screen)
- *   Layer 2: Scoring (4 checks x 25pts = 100 max)
+ *   Layer 2: Scoring (4 weighted checks = 100 max)
  *   Layer 3: Red Flags (anomaly overlay)
  *
  * Run with: npx vitest run tests/demo-pipeline.test.ts --reporter=verbose
@@ -151,7 +151,7 @@ describe("Full Tier 1 Pipeline Demo", () => {
   // -----------------------------------------------------------------
   // Scenario 4: Young org with low revenue → REVIEW (score ~50)
   // -----------------------------------------------------------------
-  it("Young small org: scores 88 (PASS with new revenue floor)", () => {
+  it("Young small org: scores 95 (PASS with new revenue floor)", () => {
     const profile = makeProfile({
       name: "New Community Aid",
       years_operating: 2, // REVIEW (< yearsPassMin=3, >= yearsReviewMin=1)
@@ -183,12 +183,12 @@ describe("Full Tier 1 Pipeline Demo", () => {
 
     expect(result.gate_blocked).toBe(false);
 
-    // years_operating = REVIEW (2 yrs, need 3 for PASS) → 12.5 pts
+    // years_operating = REVIEW (2 yrs, need 3 for PASS) → 5 pts (half of 10)
     // revenue_range = PASS ($80K >= passMin $50K) → 25 pts
-    // spend_rate = PASS (0.7 >= passMin 0.6) → 25 pts
-    // recent_990 = PASS (recent) → 25 pts
-    // Score: 12.5 + 25 + 25 + 25 = 87.5 → rounds to 88
-    expect(result.score).toBe(88);
+    // spend_rate = PASS (0.7 >= passMin 0.6) → 35 pts
+    // recent_990 = PASS (recent) → 30 pts
+    // Score: 5 + 25 + 35 + 30 = 95
+    expect(result.score).toBe(95);
     expect(result.recommendation).toBe("PASS");
 
     // years_operating: 2 is above redFlagTooNewYears=1, so no "too_new" flag
