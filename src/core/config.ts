@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import {
   VettingThresholds,
   PortfolioFitConfig,
+  GivingTuesdayConfig,
 } from "../domain/nonprofit/types.js";
 import type { DiscoveryIndexConfig } from "../domain/discovery/types.js";
 
@@ -305,6 +306,51 @@ export function loadDiscoveryConfig(): DiscoveryIndexConfig {
       Math.max(1, envInt("DISCOVERY_MAX_RESULTS", 500)),
     ),
   };
+}
+
+// ============================================================================
+// GivingTuesday Config (XML 990 pipeline)
+// ============================================================================
+
+const GIVINGTUESDAY_BASE_URL = "https://990-infrastructure.gtdata.org";
+
+export function loadGivingTuesdayConfig(): GivingTuesdayConfig {
+  const config: GivingTuesdayConfig = {
+    apiBaseUrl: GIVINGTUESDAY_BASE_URL,
+    rateLimitMs: Math.max(200, envInt("GT_RATE_LIMIT_MS", 1000)),
+    xmlCacheDir: path.resolve(__dirname, "../../data/xml-cache"),
+    maxXmlSizeBytes: Math.min(
+      50 * 1024 * 1024,
+      Math.max(1024, envInt("GT_MAX_XML_SIZE_BYTES", 25 * 1024 * 1024)),
+    ),
+    maxRetries: Math.max(0, Math.min(10, envInt("GT_MAX_RETRIES", 3))),
+    retryBackoffMs: Math.max(100, envInt("GT_RETRY_BACKOFF_MS", 2000)),
+  };
+  validateGivingTuesdayConfig(config);
+  return config;
+}
+
+export function validateGivingTuesdayConfig(config: GivingTuesdayConfig): void {
+  const errors: string[] = [];
+
+  if (!config.apiBaseUrl.startsWith("https://")) {
+    errors.push("apiBaseUrl must start with https://");
+  }
+  if (config.rateLimitMs < 200) {
+    errors.push("rateLimitMs must be >= 200");
+  }
+  if (config.maxXmlSizeBytes > 50 * 1024 * 1024) {
+    errors.push("maxXmlSizeBytes must be <= 50MB");
+  }
+  if (config.maxXmlSizeBytes < 1024) {
+    errors.push("maxXmlSizeBytes must be >= 1024");
+  }
+
+  if (errors.length > 0) {
+    throw new Error(
+      `Invalid GivingTuesday config:\n  - ${errors.join("\n  - ")}`,
+    );
+  }
 }
 
 /**

@@ -12,6 +12,13 @@ import type {
   CourtListenerCase,
   CourtRecordsResult,
   Tier1Result,
+  GtFilingIndexEntry,
+  GivingTuesdayConfig,
+  Xml990ExtractedData,
+  PartIXData,
+  PartVIData,
+  PartVIIEntry,
+  PartVIIIData,
 } from "../src/domain/nonprofit/types.js";
 import { loadThresholds } from "../src/core/config.js";
 
@@ -316,4 +323,172 @@ export function makeTier1Result(overrides?: Partial<Tier1Result>): Tier1Result {
     red_flags: [],
     ...overrides,
   };
+}
+
+// ============================================================================
+// XML 990 Fixtures
+// ============================================================================
+
+export function makeGtFilingEntry(
+  overrides?: Partial<GtFilingIndexEntry>,
+): GtFilingIndexEntry {
+  return {
+    ObjectId: "202301234567890123_public",
+    EIN: "131624100",
+    FormType: "990",
+    ReturnVersion: "2021v4.2",
+    TaxYear: "2022",
+    TaxPeriod: "2022-06-30",
+    URL: "https://irs-990-efiler-data.s3.amazonaws.com/xml/202301234567890123_public.xml",
+    OrganizationName: "MUSEUM OF MODERN ART",
+    FileSizeBytes: "245000",
+    FileSha256: "abc123def456",
+    ...overrides,
+  };
+}
+
+export function makeGivingTuesdayConfig(
+  overrides?: Partial<GivingTuesdayConfig>,
+): GivingTuesdayConfig {
+  return {
+    apiBaseUrl: "https://990-infrastructure.gtdata.org",
+    rateLimitMs: 200,
+    xmlCacheDir: "/tmp/test-xml-cache",
+    maxXmlSizeBytes: 25 * 1024 * 1024,
+    maxRetries: 1,
+    retryBackoffMs: 100,
+    ...overrides,
+  };
+}
+
+export function makePartIXData(
+  overrides?: Partial<PartIXData>,
+): PartIXData {
+  return {
+    totalExpenses: 400_000,
+    programServicesExpenses: 320_000,
+    managementAndGeneralExpenses: 60_000,
+    fundraisingExpenses: 20_000,
+    programExpenseRatio: 0.8,
+    fundraisingRatio: 0.05,
+    adminRatio: 0.15,
+    ratiosValid: true,
+    ...overrides,
+  };
+}
+
+export function makePartVIData(
+  overrides?: Partial<PartVIData>,
+): PartVIData {
+  return {
+    votingMembersCount: 12,
+    independentMembersCount: 10,
+    familyOrBusinessRelationship: false,
+    delegationOfMgmtDuties: false,
+    conflictOfInterestPolicy: true,
+    whistleblowerPolicy: true,
+    documentRetentionPolicy: true,
+    compensationProcessCEO: true,
+    materialDiversionOfAssets: false,
+    ...overrides,
+  };
+}
+
+export function makePartVIIEntry(
+  overrides?: Partial<PartVIIEntry>,
+): PartVIIEntry {
+  return {
+    name: "Jane Doe",
+    title: "Executive Director",
+    avgHoursPerWeek: 40,
+    isTrusteeOrDirector: false,
+    isOfficer: true,
+    isKeyEmployee: true,
+    reportableCompFromOrg: 150_000,
+    reportableCompFromRelated: 0,
+    otherCompensation: 25_000,
+    ...overrides,
+  };
+}
+
+export function makePartVIIIData(
+  overrides?: Partial<PartVIIIData>,
+): PartVIIIData {
+  return {
+    contributions: 300_000,
+    programServiceRevenue: 150_000,
+    investmentIncome: 30_000,
+    otherRevenue: 20_000,
+    totalRevenue: 500_000,
+    contributionDependence: 0.6,
+    programRevenueSelfSufficiency: 0.3,
+    ratiosValid: true,
+    ...overrides,
+  };
+}
+
+export function makeXml990ExtractedData(
+  overrides?: Partial<Xml990ExtractedData>,
+): Xml990ExtractedData {
+  return {
+    ein: "131624100",
+    taxYear: 2022,
+    objectId: "202301234567890123_public",
+    formType: "990",
+    schemaVersion: "2021v4.2",
+    partIX: makePartIXData(),
+    partVI: makePartVIData(),
+    partVII: [makePartVIIEntry()],
+    partVIII: makePartVIIIData(),
+    extractedAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+/** Minimal 990 XML string for parser unit tests */
+export function makeMinimal990Xml(): string {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<Return xmlns="http://www.irs.gov/efile" returnVersion="2021v4.2">
+  <ReturnData>
+    <IRS990>
+      <TotalFunctionalExpensesGrp>
+        <TotalAmt>400000</TotalAmt>
+        <ProgramServicesAmt>320000</ProgramServicesAmt>
+        <ManagementAndGeneralAmt>60000</ManagementAndGeneralAmt>
+        <FundraisingAmt>20000</FundraisingAmt>
+      </TotalFunctionalExpensesGrp>
+      <GoverningBodyVotingMembersCnt>12</GoverningBodyVotingMembersCnt>
+      <NbrIndependentVotingMembersCnt>10</NbrIndependentVotingMembersCnt>
+      <FamilyOrBusinessRlnInd>false</FamilyOrBusinessRlnInd>
+      <DelegationOfMgmtDutiesInd>false</DelegationOfMgmtDutiesInd>
+      <ConflictOfInterestPolicyInd>true</ConflictOfInterestPolicyInd>
+      <WhistleblowerPolicyInd>true</WhistleblowerPolicyInd>
+      <DocumentRetentionPolicyInd>true</DocumentRetentionPolicyInd>
+      <CompensationProcessCEOInd>true</CompensationProcessCEOInd>
+      <MaterialDiversionOrMisuseInd>false</MaterialDiversionOrMisuseInd>
+      <Form990PartVIISectionAGrp>
+        <PersonNm>JANE DOE</PersonNm>
+        <TitleTxt>EXECUTIVE DIRECTOR</TitleTxt>
+        <AverageHoursPerWeekRt>40</AverageHoursPerWeekRt>
+        <IndividualTrusteeOrDirectorInd>false</IndividualTrusteeOrDirectorInd>
+        <OfficerInd>true</OfficerInd>
+        <KeyEmployeeInd>true</KeyEmployeeInd>
+        <ReportableCompFromOrgAmt>150000</ReportableCompFromOrgAmt>
+        <ReportableCompFromRltdOrgAmt>0</ReportableCompFromRltdOrgAmt>
+        <OtherCompensationAmt>25000</OtherCompensationAmt>
+      </Form990PartVIISectionAGrp>
+      <TotalContributionsAmt>300000</TotalContributionsAmt>
+      <ProgramServiceRevenueGrp>
+        <TotalRevenueColumnAmt>150000</TotalRevenueColumnAmt>
+      </ProgramServiceRevenueGrp>
+      <InvestmentIncomeGrp>
+        <TotalRevenueColumnAmt>30000</TotalRevenueColumnAmt>
+      </InvestmentIncomeGrp>
+      <OtherRevenueGrp>
+        <TotalRevenueColumnAmt>20000</TotalRevenueColumnAmt>
+      </OtherRevenueGrp>
+      <CYTotalRevenueAmt>500000</CYTotalRevenueAmt>
+    </IRS990>
+  </ReturnData>
+</Return>`;
 }
