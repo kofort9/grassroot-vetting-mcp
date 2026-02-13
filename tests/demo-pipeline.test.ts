@@ -58,7 +58,7 @@ describe("Full Tier 1 Pipeline Demo", () => {
     expect(result.checks!.map((c) => c.name)).toEqual([
       "years_operating",
       "revenue_range",
-      "overhead_ratio",
+      "spend_rate",
       "recent_990",
     ]);
     expect(result.checks!.every((c) => c.result === "PASS")).toBe(true);
@@ -151,20 +151,20 @@ describe("Full Tier 1 Pipeline Demo", () => {
   // -----------------------------------------------------------------
   // Scenario 4: Young org with low revenue → REVIEW (score ~50)
   // -----------------------------------------------------------------
-  it("Young small org: scores 75 (borderline PASS)", () => {
+  it("Young small org: scores 88 (PASS with new revenue floor)", () => {
     const profile = makeProfile({
       name: "New Community Aid",
-      years_operating: 2, // REVIEW (< yearsPassMin=5, >= yearsReviewMin=1)
+      years_operating: 2, // REVIEW (< yearsPassMin=3, >= yearsReviewMin=1)
       ruling_date: "2024-01-01",
       latest_990: {
         tax_period: `${new Date().getFullYear() - 1}-06`,
         tax_year: new Date().getFullYear() - 1,
         form_type: "990",
-        total_revenue: 80_000, // REVIEW (80K is in review range)
+        total_revenue: 80_000, // PASS ($80K >= passMin $50K)
         total_expenses: 56_000,
         total_assets: 50_000,
         total_liabilities: 10_000,
-        overhead_ratio: 0.7, // PASS (0.7 = expenseRatioPassMin)
+        overhead_ratio: 0.7, // PASS (0.7 >= passMin 0.6)
         officer_compensation_ratio: null,
       },
     });
@@ -183,16 +183,15 @@ describe("Full Tier 1 Pipeline Demo", () => {
 
     expect(result.gate_blocked).toBe(false);
 
-    // years_operating = REVIEW (2 yrs, need 5 for PASS) → 12.5 pts
-    // revenue_range = REVIEW (80K in review range) → 12.5 pts
-    // overhead_ratio = PASS (0.7 = expenseRatioPassMin) → 25 pts
+    // years_operating = REVIEW (2 yrs, need 3 for PASS) → 12.5 pts
+    // revenue_range = PASS ($80K >= passMin $50K) → 25 pts
+    // spend_rate = PASS (0.7 >= passMin 0.6) → 25 pts
     // recent_990 = PASS (recent) → 25 pts
-    // Score: 12.5 + 12.5 + 25 + 25 = 75 → right at PASS boundary
-    expect(result.score).toBe(75);
+    // Score: 12.5 + 25 + 25 + 25 = 87.5 → rounds to 88
+    expect(result.score).toBe(88);
     expect(result.recommendation).toBe("PASS");
 
     // years_operating: 2 is above redFlagTooNewYears=1, so no "too_new" flag
-    // This is the "forgiveness" the new threshold 75 provides
     expect(result.red_flags).toEqual([]);
   });
 

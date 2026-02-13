@@ -39,7 +39,7 @@ export interface VettingThresholds {
   // Check weights (4 checks x 25 = 100; 501c3 moved to gate layer)
   weightYearsOperating: number;
   weightRevenueRange: number;
-  weightOverheadRatio: number;
+  weightSpendRate: number;
   weightRecent990: number;
 
   // Years operating

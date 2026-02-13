@@ -62,16 +62,16 @@ export const CHECK_MESSAGES: Record<
   },
   revenue_range: {
     PASS: {
-      factor: "Revenue in target range ($100K-$10M)",
+      factor: "Revenue in target range ($50K-$10M)",
       weight: "positive",
     },
     REVIEW: { factor: "Revenue outside ideal range", weight: "neutral" },
     FAIL: { factor: "Revenue outside acceptable range", weight: "negative" },
   },
-  overhead_ratio: {
-    PASS: { factor: "Healthy expense-to-revenue ratio", weight: "positive" },
-    REVIEW: { factor: "Expense ratio needs review", weight: "neutral" },
-    FAIL: { factor: "Concerning expense ratio", weight: "negative" },
+  spend_rate: {
+    PASS: { factor: "Healthy spend rate", weight: "positive" },
+    REVIEW: { factor: "Spend rate needs review", weight: "neutral" },
+    FAIL: { factor: "Concerning spend rate", weight: "negative" },
   },
   recent_990: {
     PASS: { factor: "Recent financial data available", weight: "positive" },
@@ -86,8 +86,8 @@ export const CHECK_MESSAGES: Record<
 
 export const RED_FLAG_FACTORS: Partial<Record<RedFlagType, string>> = {
   stale_990: "Financial data is severely outdated",
-  low_fund_deployment: "Low fund deployment ratio",
-  very_high_overhead: "Unsustainable expense-to-revenue ratio",
+  low_fund_deployment: "Low spend rate",
+  very_high_overhead: "Unsustainable spend rate",
   very_low_revenue: "Very small operation",
   revenue_decline: "Significant revenue decline",
   too_new: "Organization is less than 1 year old",

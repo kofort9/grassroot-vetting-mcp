@@ -79,7 +79,7 @@ export function loadThresholds(): VettingThresholds {
     // Check weights (4 checks x 25 = 100; 501c3 moved to gate layer)
     weightYearsOperating: envInt("VETTING_WEIGHT_YEARS", 25),
     weightRevenueRange: envInt("VETTING_WEIGHT_REVENUE", 25),
-    weightOverheadRatio: envInt("VETTING_WEIGHT_OVERHEAD", 25),
+    weightSpendRate: envInt("VETTING_WEIGHT_OVERHEAD", 25),
     weightRecent990: envInt("VETTING_WEIGHT_990", 25),
 
     // Years operating
@@ -87,16 +87,16 @@ export function loadThresholds(): VettingThresholds {
     yearsReviewMin: envInt("VETTING_YEARS_REVIEW_MIN", 1),
 
     // Revenue range ($)
-    revenueFailMin: envInt("VETTING_REVENUE_FAIL_MIN", 50000),
-    revenuePassMin: envInt("VETTING_REVENUE_PASS_MIN", 100000),
+    revenueFailMin: envInt("VETTING_REVENUE_FAIL_MIN", 25000),
+    revenuePassMin: envInt("VETTING_REVENUE_PASS_MIN", 50000),
     revenuePassMax: envInt("VETTING_REVENUE_PASS_MAX", 10000000),
     revenueReviewMax: envInt("VETTING_REVENUE_REVIEW_MAX", 50000000),
 
     // Expense-to-revenue ratio
-    expenseRatioPassMin: envFloat("VETTING_EXPENSE_RATIO_PASS_MIN", 0.7),
-    expenseRatioPassMax: envFloat("VETTING_EXPENSE_RATIO_PASS_MAX", 1.0),
-    expenseRatioHighReview: envFloat("VETTING_EXPENSE_RATIO_HIGH_REVIEW", 1.2),
-    expenseRatioLowReview: envFloat("VETTING_EXPENSE_RATIO_LOW_REVIEW", 0.5),
+    expenseRatioPassMin: envFloat("VETTING_EXPENSE_RATIO_PASS_MIN", 0.6),
+    expenseRatioPassMax: envFloat("VETTING_EXPENSE_RATIO_PASS_MAX", 1.3),
+    expenseRatioHighReview: envFloat("VETTING_EXPENSE_RATIO_HIGH_REVIEW", 1.5),
+    expenseRatioLowReview: envFloat("VETTING_EXPENSE_RATIO_LOW_REVIEW", 0.4),
 
     // 990 filing recency (years)
     filing990PassMax: envInt("VETTING_990_PASS_MAX_YEARS", 3),
@@ -108,8 +108,8 @@ export function loadThresholds(): VettingThresholds {
 
     // Red flag thresholds
     redFlagStale990Years: envInt("VETTING_RF_STALE_990_YEARS", 4),
-    redFlagHighExpenseRatio: envFloat("VETTING_RF_HIGH_EXPENSE_RATIO", 1.2),
-    redFlagLowExpenseRatio: envFloat("VETTING_RF_LOW_EXPENSE_RATIO", 0.5),
+    redFlagHighExpenseRatio: envFloat("VETTING_RF_HIGH_EXPENSE_RATIO", 1.5),
+    redFlagLowExpenseRatio: envFloat("VETTING_RF_LOW_EXPENSE_RATIO", 0.4),
     redFlagVeryLowRevenue: envInt("VETTING_RF_VERY_LOW_REVENUE", 25000),
     redFlagRevenueDeclinePercent: envFloat(
       "VETTING_RF_REVENUE_DECLINE_PCT",
@@ -136,7 +136,7 @@ export function validateThresholds(t: VettingThresholds): void {
   const weights = [
     t.weightYearsOperating,
     t.weightRevenueRange,
-    t.weightOverheadRatio,
+    t.weightSpendRate,
     t.weightRecent990,
   ];
   if (weights.some((w) => w < 0)) {

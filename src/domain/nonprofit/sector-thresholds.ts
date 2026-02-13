@@ -9,27 +9,17 @@ import { loadThresholds, validateThresholds } from "../../core/config.js";
  * sector-specific values — all others inherit from the base thresholds.
  *
  * Sources for initial calibration:
- * - K (Food/Agriculture): Food banks are pass-through orgs with expense ratios
- *   often >1.0x due to distributed donated goods counted as both revenue and expense.
- * - A (Arts/Culture): Smaller revenue is normal; overhead can be higher due to
- *   venue and production costs.
+ * - A (Arts/Culture): Very low revenue threshold is lower than base.
  * - E (Health): Larger organizations with higher compensation norms.
+ * - K (Food/Agriculture): Small food banks and pantries are common; lower PASS floor.
+ * - L (Housing/Shelter): Small shelters operate on tight budgets.
+ * - O (Youth Development): After-school and mentoring programs often run lean.
+ * - P (Human Services): Broad category with many small grassroots orgs.
+ * - S (Community Improvement): Neighborhood orgs, mutual aid, civic groups.
  */
 const SECTOR_OVERRIDES: Record<string, Partial<VettingThresholds>> = {
-  // K = Food, Agriculture, and Nutrition
-  K: {
-    expenseRatioPassMin: 0.6,
-    expenseRatioPassMax: 1.3,
-    expenseRatioHighReview: 1.5,
-    redFlagHighExpenseRatio: 1.5,
-    redFlagLowExpenseRatio: 0.4,
-  },
-
   // A = Arts, Culture, and Humanities
   A: {
-    revenueFailMin: 25_000,
-    revenuePassMin: 50_000,
-    expenseRatioPassMin: 0.6,
     redFlagVeryLowRevenue: 15_000,
   },
 
@@ -39,6 +29,31 @@ const SECTOR_OVERRIDES: Record<string, Partial<VettingThresholds>> = {
     revenueReviewMax: 100_000_000,
     redFlagHighCompensation: 0.5,
     redFlagModerateCompensation: 0.35,
+  },
+
+  // K = Food, Agriculture, and Nutrition
+  K: {
+    revenuePassMin: 25_000,
+  },
+
+  // L = Housing, Shelter
+  L: {
+    revenuePassMin: 30_000,
+  },
+
+  // O = Youth Development
+  O: {
+    revenuePassMin: 25_000,
+  },
+
+  // P = Human Services
+  P: {
+    revenuePassMin: 30_000,
+  },
+
+  // S = Community Improvement, Capacity Building
+  S: {
+    revenuePassMin: 25_000,
   },
 };
 

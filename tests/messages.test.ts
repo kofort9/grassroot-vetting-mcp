@@ -61,7 +61,7 @@ describe("CHECK_MESSAGES", () => {
   const expectedChecks = [
     "years_operating",
     "revenue_range",
-    "overhead_ratio",
+    "spend_rate",
     "recent_990",
   ];
 
@@ -103,7 +103,7 @@ describe("generateSummary", () => {
   const allPassChecks: Tier1Check[] = [
     makeCheck({ name: "years_operating", result: "PASS" }),
     makeCheck({ name: "revenue_range", result: "PASS" }),
-    makeCheck({ name: "overhead_ratio", result: "PASS" }),
+    makeCheck({ name: "spend_rate", result: "PASS" }),
     makeCheck({ name: "recent_990", result: "PASS" }),
   ];
 
@@ -190,7 +190,7 @@ describe("generateSummary", () => {
         passed: false,
         detail: "Revenue too low",
       }),
-      makeCheck({ name: "overhead_ratio", result: "PASS" }),
+      makeCheck({ name: "spend_rate", result: "PASS" }),
       makeCheck({ name: "recent_990", result: "PASS" }),
     ];
 
@@ -228,7 +228,7 @@ describe("generateSummary", () => {
         }),
         makeCheck({ name: "revenue_range", result: "FAIL", detail: "Issue 2" }),
         makeCheck({
-          name: "overhead_ratio",
+          name: "spend_rate",
           result: "FAIL",
           detail: "Issue 3",
         }),

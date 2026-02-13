@@ -128,36 +128,36 @@ export function checkOverheadRatio(
 
   if (ratio === undefined || ratio === null || Number.isNaN(ratio)) {
     result = "REVIEW";
-    detail = "Cannot calculate expense efficiency - missing data";
+    detail = "Cannot calculate spend rate - missing data";
   } else if (ratio < 0) {
     result = "FAIL";
-    detail = `Negative expense-to-revenue ratio (${formatPercent(ratio)}) - data anomaly requires investigation`;
+    detail = `Negative spend rate (${formatPercent(ratio)}) - data anomaly requires investigation`;
   } else if (ratio >= t.expenseRatioPassMin && ratio <= t.expenseRatioPassMax) {
     result = "PASS";
-    detail = `${formatPercent(ratio)} expense-to-revenue ratio - healthy fund deployment`;
+    detail = `${formatPercent(ratio)} spend rate - healthy fund deployment`;
   } else if (
     ratio > t.expenseRatioPassMax &&
     ratio <= t.expenseRatioHighReview
   ) {
     result = "REVIEW";
-    detail = `${formatPercent(ratio)} expense-to-revenue ratio - spending exceeds revenue (check reserves)`;
+    detail = `${formatPercent(ratio)} spend rate - spending exceeds revenue (check reserves)`;
   } else if (ratio > t.expenseRatioHighReview) {
     result = "FAIL";
-    detail = `${formatPercent(ratio)} expense-to-revenue ratio - potentially unsustainable`;
+    detail = `${formatPercent(ratio)} spend rate - potentially unsustainable`;
   } else if (ratio >= t.expenseRatioLowReview) {
     result = "REVIEW";
-    detail = `${formatPercent(ratio)} expense-to-revenue ratio - lower than typical (accumulating reserves?)`;
+    detail = `${formatPercent(ratio)} spend rate - lower than typical (accumulating reserves?)`;
   } else {
     result = "FAIL";
-    detail = `${formatPercent(ratio)} expense-to-revenue ratio - very low fund deployment`;
+    detail = `${formatPercent(ratio)} spend rate - very low fund deployment`;
   }
 
   return {
-    name: "overhead_ratio",
+    name: "spend_rate",
     passed: result === "PASS",
     result,
     detail,
-    weight: t.weightOverheadRatio,
+    weight: t.weightSpendRate,
   };
 }
 
@@ -325,16 +325,36 @@ export function detectRedFlags(
       });
     }
 
-    // Officer compensation ratio (from profile summary)
+    // Officer compensation ratio — size-tiered thresholds
     const compRatio = profile.latest_990.officer_compensation_ratio;
     if (compRatio != null && Number.isFinite(compRatio) && compRatio > 0) {
-      if (compRatio > t.redFlagHighCompensation) {
+      const revenue = profile.latest_990.total_revenue ?? 0;
+
+      // Determine size-tier thresholds
+      let highThreshold: number;
+      let moderateThreshold: number;
+      if (revenue < 250_000) {
+        highThreshold = 0.6;
+        moderateThreshold = 0.4;
+      } else if (revenue < 1_000_000) {
+        highThreshold = 0.5;
+        moderateThreshold = 0.3;
+      } else {
+        highThreshold = t.redFlagHighCompensation;
+        moderateThreshold = t.redFlagModerateCompensation;
+      }
+
+      // Sector overrides: max(sector_threshold, size_tier_threshold) wins
+      highThreshold = Math.max(highThreshold, t.redFlagHighCompensation);
+      moderateThreshold = Math.max(moderateThreshold, t.redFlagModerateCompensation);
+
+      if (compRatio > highThreshold) {
         flags.push({
           severity: "HIGH",
           type: "high_officer_compensation",
-          detail: `Officer/director compensation is ${formatPercent(compRatio)} of total expenses — exceeds ${formatPercent(t.redFlagHighCompensation)} threshold`,
+          detail: `Officer/director compensation is ${formatPercent(compRatio)} of total expenses — exceeds ${formatPercent(highThreshold)} threshold`,
         });
-      } else if (compRatio > t.redFlagModerateCompensation) {
+      } else if (compRatio > moderateThreshold) {
         flags.push({
           severity: "MEDIUM",
           type: "high_officer_compensation",
