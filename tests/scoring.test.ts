@@ -389,13 +389,47 @@ describe("getRecommendation", () => {
     expect(getRecommendation(95, [highFlag], t)).toBe("REJECT");
   });
 
-  it("does not auto-reject on MEDIUM flags", () => {
+  it("downgrades PASS to REVIEW on MEDIUM flags", () => {
     const medFlag = {
       severity: "MEDIUM" as const,
       type: "too_new" as const,
       detail: "test",
     };
-    expect(getRecommendation(85, [medFlag], t)).toBe("PASS");
+    expect(getRecommendation(85, [medFlag], t)).toBe("REVIEW");
+  });
+
+  it("MEDIUM flag + score in REVIEW range stays REVIEW", () => {
+    const medFlag = {
+      severity: "MEDIUM" as const,
+      type: "too_new" as const,
+      detail: "test",
+    };
+    expect(getRecommendation(60, [medFlag], t)).toBe("REVIEW");
+  });
+
+  it("MEDIUM flag + score below REVIEW range stays REJECT", () => {
+    const medFlag = {
+      severity: "MEDIUM" as const,
+      type: "too_new" as const,
+      detail: "test",
+    };
+    expect(getRecommendation(40, [medFlag], t)).toBe("REJECT");
+  });
+
+  it("multiple MEDIUM flags + PASS score → REVIEW", () => {
+    const flags = [
+      { severity: "MEDIUM" as const, type: "too_new" as const, detail: "test" },
+      { severity: "MEDIUM" as const, type: "very_low_revenue" as const, detail: "test" },
+    ];
+    expect(getRecommendation(85, flags, t)).toBe("REVIEW");
+  });
+
+  it("HIGH + MEDIUM flags → REJECT (HIGH takes precedence)", () => {
+    const flags = [
+      { severity: "HIGH" as const, type: "stale_990" as const, detail: "test" },
+      { severity: "MEDIUM" as const, type: "too_new" as const, detail: "test" },
+    ];
+    expect(getRecommendation(85, flags, t)).toBe("REJECT");
   });
 });
 

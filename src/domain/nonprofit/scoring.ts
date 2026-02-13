@@ -242,6 +242,11 @@ export function getRecommendation(
     return "REJECT";
   }
 
+  // MEDIUM flags force PASS → REVIEW (human review safety net)
+  if (redFlags.some((flag) => flag.severity === "MEDIUM") && score >= t.scorePassMin) {
+    return "REVIEW";
+  }
+
   if (score >= t.scorePassMin) {
     return "PASS";
   } else if (score >= t.scoreReviewMin) {
