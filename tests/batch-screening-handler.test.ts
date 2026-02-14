@@ -46,12 +46,12 @@ function makeMockCtx(
   } as ServerContext;
 }
 
-describe("batch_tier1 handler", () => {
+describe("batch_screening handler", () => {
   let tool: ToolDefinition;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    tool = findTool("batch_tier1");
+    tool = findTool("batch_screening");
   });
 
   it("rejects empty eins array", async () => {
@@ -221,12 +221,12 @@ describe("batch_tier1 handler", () => {
   });
 });
 
-describe("check_tier1 handler error ordering", () => {
+describe("screen_nonprofit handler error ordering", () => {
   let tool: ToolDefinition;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    tool = findTool("check_tier1");
+    tool = findTool("screen_nonprofit");
   });
 
   it("returns error response when pipeline returns success=false", async () => {

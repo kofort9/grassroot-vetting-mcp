@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   searchNonprofit,
   getNonprofitProfile,
-  checkTier1,
+  screenNonprofit,
   getRedFlags,
 } from "../src/domain/nonprofit/tools.js";
 import { ProPublicaClient } from "../src/domain/nonprofit/propublica-client.js";
@@ -264,7 +264,7 @@ describe("getNonprofitProfile", () => {
 // checkTier1
 // ============================================================================
 
-describe("checkTier1", () => {
+describe("screenNonprofit", () => {
   let client: ProPublicaClient;
   let irsClient: ReturnType<typeof makeMockIrsClient>;
   let ofacClient: ReturnType<typeof makeMockOfacClient>;
@@ -276,7 +276,7 @@ describe("checkTier1", () => {
   });
 
   it("returns error for missing EIN", async () => {
-    const result = await checkTier1(
+    const result = await screenNonprofit(
       client,
       { ein: "" },
       t,
@@ -292,7 +292,7 @@ describe("checkTier1", () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(
       null,
     );
-    const result = await checkTier1(
+    const result = await screenNonprofit(
       client,
       { ein: "12-3456789" },
       t,
@@ -308,7 +308,7 @@ describe("checkTier1", () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(
       makeOrgResponse(),
     );
-    const result = await checkTier1(
+    const result = await screenNonprofit(
       client,
       { ein: "95-3135649" },
       t,
@@ -332,7 +332,7 @@ describe("checkTier1", () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(
       makeOrgResponse(),
     );
-    const result = await checkTier1(
+    const result = await screenNonprofit(
       client,
       { ein: "95-3135649" },
       t,
@@ -348,7 +348,7 @@ describe("checkTier1", () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(
       makeOrgResponse(),
     );
-    const result = await checkTier1(
+    const result = await screenNonprofit(
       client,
       { ein: "95-3135649" },
       t,
@@ -368,7 +368,7 @@ describe("checkTier1", () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(
       response,
     );
-    const result = await checkTier1(
+    const result = await screenNonprofit(
       client,
       { ein: "95-3135649" },
       t,
@@ -388,7 +388,7 @@ describe("checkTier1", () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error("API down"),
     );
-    const result = await checkTier1(
+    const result = await screenNonprofit(
       client,
       { ein: "95-3135649" },
       t,

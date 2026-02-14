@@ -84,9 +84,9 @@ export function getToolDefinitions(): ToolDefinition[] {
         ),
     },
     {
-      name: "check_tier1",
+      name: "screen_nonprofit",
       description:
-        "Run Tier 1 vetting. Three layers: (1) Pre-screen gates — verified 501(c)(3), OFAC sanctions, 990 filing exists, portfolio fit (NTEE category). (2) Scoring engine — years, revenue, expense ratio, 990 recency (100 pts). (3) Red flag overlay. Thresholds: 75+ PASS, 50-74 REVIEW, <50 REJECT. Results are saved and cached — re-vetting returns the cached result unless force_refresh is true.",
+        "Run automated financial screening. Three layers: (1) Pre-screen gates — verified 501(c)(3), OFAC sanctions, 990 filing exists, portfolio fit (NTEE category). (2) Scoring engine — years, revenue, expense ratio, 990 recency (100 pts). (3) Red flag overlay. Thresholds: 75+ PASS, 50-74 REVIEW, <50 REJECT. Results are saved and cached — re-screening returns the cached result unless force_refresh is true.",
       inputSchema: {
         type: "object",
         properties: {
@@ -188,9 +188,9 @@ export function getToolDefinitions(): ToolDefinition[] {
       },
     },
     {
-      name: "batch_tier1",
+      name: "batch_screening",
       description:
-        "Run Tier 1 vetting on multiple nonprofits at once. Processes EINs sequentially (respects rate limits). Max 25 EINs per batch. Returns per-EIN results + summary stats.",
+        "Run automated financial screening on multiple nonprofits at once. Processes EINs sequentially (respects rate limits). Max 25 EINs per batch. Returns per-EIN results + summary stats.",
       inputSchema: {
         type: "object",
         properties: {

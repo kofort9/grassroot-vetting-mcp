@@ -15,7 +15,7 @@ This tool targets **grassroots and community-based nonprofits** ($100K-$10M reve
 ### Vetting (ProPublica Nonprofit Explorer)
 - **search_nonprofit** - Search for nonprofits by name, with optional state/city filters
 - **get_nonprofit_profile** - Get detailed profile including 990 financial summary
-- **check_tier1** - Run automated financial screening: pre-screen gates → scoring engine → red flag overlay
+- **screen_nonprofit** - Run automated financial screening: pre-screen gates → scoring engine → red flag overlay
 - **get_red_flags** - Identify warning signs and issues
 
 ### Tracking
@@ -24,7 +24,7 @@ This tool targets **grassroots and community-based nonprofits** ($100K-$10M reve
 
 ## How Screening Works
 
-`check_tier1` runs three layers in sequence:
+`screen_nonprofit` runs three layers in sequence:
 
 ### Layer 1: Pre-Screen Gates
 
@@ -120,7 +120,7 @@ Find education nonprofits in Oakland, CA and vet the most established one:
 discover_nonprofits(state: "CA", city: "Oakland", ntee_categories: ["B"], limit: 5)
 → 340 matches, including "Academy of Chinese Culture And" (est. 1982)
 
-check_tier1(ein: "942881684")
+screen_nonprofit(ein: "942881684")
 → PASS (88/100) — 43 years operating, $2.3M revenue, 13 filings
 → One flag: expense ratio 100.6% (spending slightly exceeds revenue)
 → Passes financial screening
@@ -134,7 +134,7 @@ Find youth-focused human services orgs in New York:
 discover_nonprofits(state: "NY", ntee_categories: ["P"], name_contains: "youth", limit: 5)
 → 108 matches, including "Africa Youth Initiative Inc" (est. 2019)
 
-check_tier1(ein: "833882840")
+screen_nonprofit(ein: "833882840")
 → REJECT — failed filing_exists gate (no 990s on record)
 → Valid 501(c)(3), not sanctioned, but can't evaluate financials
 → Blocked before scoring even starts
@@ -148,7 +148,7 @@ Find newer health nonprofits in Texas:
 discover_nonprofits(state: "TX", ntee_categories: ["E"], min_ruling_year: 2015, limit: 5)
 → 1,787 matches, including "2435 Kinwest Medical Clinic" (est. 2015)
 
-check_tier1(ein: "463710579")
+screen_nonprofit(ein: "463710579")
 → REVIEW (63/100) — passes all gates, but:
   - $48K revenue (too small to assess reliably)
   - 118.5% expense ratio (burning reserves)
@@ -166,7 +166,7 @@ search_nonprofit(query: "Teach For America")
 get_nonprofit_profile(ein: "13-3541913")
 → Full financial summary, years operating, latest 990
 
-check_tier1(ein: "13-3541913")
+screen_nonprofit(ein: "13-3541913")
 → Score + recommendation
 ```
 
@@ -181,7 +181,7 @@ refresh_discovery_index()
 discover_nonprofits(state: "GA", ntee_categories: ["B", "P"], limit: 100)
 → Returns 100 candidates ready for vetting
 
-# Vet each candidate individually via check_tier1
+# Vet each candidate individually via screen_nonprofit
 
 list_vetted(recommendation: "PASS")
 → See all orgs that passed screening
@@ -307,7 +307,7 @@ Get detailed profile for a nonprofit.
 }
 ```
 
-### check_tier1
+### screen_nonprofit
 
 Run automated financial screening checks.
 

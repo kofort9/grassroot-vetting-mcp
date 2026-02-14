@@ -13,7 +13,7 @@ export function getToolDefinitions(): ToolDefinition[] {
     {
       name: "discover_nonprofits",
       description:
-        "Browse and filter nonprofits from IRS Business Master File (~1.8M orgs). Zero API calls, sub-second response. Filter by state, city, NTEE category, ruling year, or name. Returns candidates ready for check_tier1 vetting. Default: 501(c)(3) orgs within platform portfolio scope.",
+        "Browse and filter nonprofits from IRS Business Master File (~1.8M orgs). Zero API calls, sub-second response. Filter by state, city, NTEE category, ruling year, or name. Returns candidates ready for screen_nonprofit. Default: 501(c)(3) orgs within platform portfolio scope.",
       inputSchema: {
         type: "object",
         properties: {

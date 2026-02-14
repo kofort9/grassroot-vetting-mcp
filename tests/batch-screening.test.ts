@@ -6,7 +6,7 @@ import type { ScreeningResult, ToolResponse } from "../src/domain/nonprofit/type
 
 // Mock the tools module
 vi.mock("../src/domain/nonprofit/tools.js", () => ({
-  checkTier1: vi.fn(),
+  screenNonprofit: vi.fn(),
 }));
 
 vi.mock("../src/core/logging.js", () => ({
@@ -16,9 +16,9 @@ vi.mock("../src/core/logging.js", () => ({
   logError: vi.fn(),
 }));
 
-import { checkTier1 } from "../src/domain/nonprofit/tools.js";
+import { screenNonprofit } from "../src/domain/nonprofit/tools.js";
 
-const mockedCheckTier1 = vi.mocked(checkTier1);
+const mockedScreenNonprofit = vi.mocked(screenNonprofit);
 
 /** Returns an ISO datetime string N days in the past */
 function daysAgo(n: number): string {
@@ -42,7 +42,7 @@ function makeMockConfig(): VettingPipelineConfig {
   };
 }
 
-describe("batch_tier1 via VettingPipeline", () => {
+describe("batch_screening via VettingPipeline", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -50,7 +50,7 @@ describe("batch_tier1 via VettingPipeline", () => {
   it("processes multiple EINs sequentially", async () => {
     const eins = ["12-3456789", "98-7654321", "55-5555555"];
 
-    mockedCheckTier1.mockImplementation(async (_client, input) => ({
+    mockedScreenNonprofit.mockImplementation(async (_client, input) => ({
       success: true,
       data: makeScreeningResult({
         ein: input.ein,
@@ -81,7 +81,7 @@ describe("batch_tier1 via VettingPipeline", () => {
     expect(stats.pass).toBe(2);
     expect(stats.review).toBe(1);
     expect(stats.reject).toBe(0);
-    expect(mockedCheckTier1).toHaveBeenCalledTimes(3);
+    expect(mockedScreenNonprofit).toHaveBeenCalledTimes(3);
   });
 
   it("counts cached results in stats", async () => {
@@ -96,7 +96,7 @@ describe("batch_tier1 via VettingPipeline", () => {
       })
       .mockReturnValueOnce(null);
 
-    mockedCheckTier1.mockResolvedValue({
+    mockedScreenNonprofit.mockResolvedValue({
       success: true,
       data: makeScreeningResult({ ein: "98-7654321" }),
       attribution: "test",
@@ -109,11 +109,11 @@ describe("batch_tier1 via VettingPipeline", () => {
 
     expect(r1.cached).toBe(true);
     expect(r2.cached).toBe(false);
-    expect(mockedCheckTier1).toHaveBeenCalledTimes(1); // only 1 uncached
+    expect(mockedScreenNonprofit).toHaveBeenCalledTimes(1); // only 1 uncached
   });
 
   it("handles errors gracefully for individual EINs", async () => {
-    mockedCheckTier1
+    mockedScreenNonprofit
       .mockResolvedValueOnce({
         success: true,
         data: makeScreeningResult({ ein: "12-3456789" }),

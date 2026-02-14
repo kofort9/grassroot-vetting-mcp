@@ -361,7 +361,7 @@ describe("Discovery E2E", () => {
   });
 
   describe("Scenario: Candidate is ready for vetting", () => {
-    it("each candidate has EIN, name, state, NTEE -- ready for check_tier1", () => {
+    it("each candidate has EIN, name, state, NTEE -- ready for screen_nonprofit", () => {
       const result = discoveryTools.discoverNonprofits(pipeline, {
         state: "CA",
         ntee_categories: ["B"],

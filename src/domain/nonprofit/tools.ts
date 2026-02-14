@@ -42,7 +42,7 @@ export interface GetNonprofitProfileInput {
   ein: string;
 }
 
-export interface CheckTier1Input {
+export interface ScreenNonprofitInput {
   ein: string;
 }
 
@@ -247,14 +247,11 @@ export async function getNonprofitProfile(
 }
 
 /**
- * check_tier1 - Run screening checks (gates → scoring → red flags)
- *
- * NOTE: Function name stays as checkTier1() to match MCP tool name.
- * Will rename to screenNonprofit() in Phase 2 when tool name changes.
+ * screen_nonprofit - Run screening checks (gates → scoring → red flags)
  */
-export async function checkTier1(
+export async function screenNonprofit(
   client: ProPublicaClient,
-  input: CheckTier1Input,
+  input: ScreenNonprofitInput,
   thresholds: VettingThresholds,
   irsClient: IrsRevocationClient,
   ofacClient: OfacSdnClient,
@@ -264,7 +261,7 @@ export async function checkTier1(
   return withEinLookup(
     client,
     input.ein,
-    "checkTier1",
+    "screenNonprofit",
     async (profile, filings) => {
       let courtResult: CourtRecordsResult | undefined;
       if (courtClient) {

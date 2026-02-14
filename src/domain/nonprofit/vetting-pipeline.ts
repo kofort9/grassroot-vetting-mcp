@@ -9,7 +9,7 @@ import type { VettingStore } from "../../data-sources/vetting-store.js";
 import type { IrsRevocationClient } from "../red-flags/irs-revocation-client.js";
 import type { OfacSdnClient } from "../red-flags/ofac-sdn-client.js";
 import type { CourtListenerClient } from "../red-flags/courtlistener-client.js";
-import { checkTier1 } from "./tools.js";
+import { screenNonprofit } from "./tools.js";
 import { logError } from "../../core/logging.js";
 
 export interface VettingPipelineConfig {
@@ -89,7 +89,7 @@ export class VettingPipeline {
       courtClient,
     } = this.config;
 
-    const response = await checkTier1(
+    const response = await screenNonprofit(
       propublicaClient,
       { ein },
       thresholds,

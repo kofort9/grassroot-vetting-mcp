@@ -5,7 +5,7 @@ import type { VettingPipelineConfig } from "../src/domain/nonprofit/vetting-pipe
 
 // Mock the tools module
 vi.mock("../src/domain/nonprofit/tools.js", () => ({
-  checkTier1: vi.fn(),
+  screenNonprofit: vi.fn(),
 }));
 
 // Mock logging to suppress output
@@ -16,9 +16,9 @@ vi.mock("../src/core/logging.js", () => ({
   logError: vi.fn(),
 }));
 
-import { checkTier1 } from "../src/domain/nonprofit/tools.js";
+import { screenNonprofit } from "../src/domain/nonprofit/tools.js";
 
-const mockedCheckTier1 = vi.mocked(checkTier1);
+const mockedScreenNonprofit = vi.mocked(screenNonprofit);
 
 /** Returns an ISO datetime string N days in the past */
 function daysAgo(n: number): string {
@@ -52,7 +52,7 @@ describe("VettingPipeline", () => {
 
   it("returns fresh result on cache miss", async () => {
     const tier1Result = makeScreeningResult({ ein: "12-3456789" });
-    mockedCheckTier1.mockResolvedValue({
+    mockedScreenNonprofit.mockResolvedValue({
       success: true,
       data: tier1Result,
       attribution: "ProPublica Nonprofit Explorer API",
@@ -65,7 +65,7 @@ describe("VettingPipeline", () => {
     expect(cached).toBe(false);
     expect(response.success).toBe(true);
     expect(response.data?.ein).toBe("12-3456789");
-    expect(mockedCheckTier1).toHaveBeenCalledOnce();
+    expect(mockedScreenNonprofit).toHaveBeenCalledOnce();
   });
 
   it("returns cached result on cache hit (within TTL)", async () => {
@@ -90,12 +90,12 @@ describe("VettingPipeline", () => {
     expect(response.success).toBe(true);
     expect(cachedNote).toContain("Previously vetted on");
     expect(cachedNote).toContain("TTL 30d");
-    expect(mockedCheckTier1).not.toHaveBeenCalled();
+    expect(mockedScreenNonprofit).not.toHaveBeenCalled();
   });
 
   it("auto-refreshes when cached result exceeds TTL", async () => {
     const tier1Result = makeScreeningResult({ ein: "12-3456789" });
-    mockedCheckTier1.mockResolvedValue({
+    mockedScreenNonprofit.mockResolvedValue({
       success: true,
       data: tier1Result,
       attribution: "ProPublica Nonprofit Explorer API",
@@ -117,12 +117,12 @@ describe("VettingPipeline", () => {
     const { cached } = await pipeline.runScreening("12-3456789");
 
     expect(cached).toBe(false);
-    expect(mockedCheckTier1).toHaveBeenCalledOnce();
+    expect(mockedScreenNonprofit).toHaveBeenCalledOnce();
   });
 
   it("respects custom cacheMaxAgeDays", async () => {
     const tier1Result = makeScreeningResult({ ein: "12-3456789" });
-    mockedCheckTier1.mockResolvedValue({
+    mockedScreenNonprofit.mockResolvedValue({
       success: true,
       data: tier1Result,
       attribution: "ProPublica Nonprofit Explorer API",
@@ -146,12 +146,12 @@ describe("VettingPipeline", () => {
 
     // 10 days old > 7-day TTL → should re-vet
     expect(cached).toBe(false);
-    expect(mockedCheckTier1).toHaveBeenCalledOnce();
+    expect(mockedScreenNonprofit).toHaveBeenCalledOnce();
   });
 
   it("bypasses cache when forceRefresh is true", async () => {
     const tier1Result = makeScreeningResult({ ein: "12-3456789" });
-    mockedCheckTier1.mockResolvedValue({
+    mockedScreenNonprofit.mockResolvedValue({
       success: true,
       data: tier1Result,
       attribution: "ProPublica Nonprofit Explorer API",
@@ -174,12 +174,12 @@ describe("VettingPipeline", () => {
     });
 
     expect(cached).toBe(false);
-    expect(mockedCheckTier1).toHaveBeenCalledOnce();
+    expect(mockedScreenNonprofit).toHaveBeenCalledOnce();
   });
 
   it("persists result on success", async () => {
     const tier1Result = makeScreeningResult();
-    mockedCheckTier1.mockResolvedValue({
+    mockedScreenNonprofit.mockResolvedValue({
       success: true,
       data: tier1Result,
       attribution: "ProPublica Nonprofit Explorer API",
@@ -201,7 +201,7 @@ describe("VettingPipeline", () => {
 
   it("does not throw when persistence fails", async () => {
     const tier1Result = makeScreeningResult();
-    mockedCheckTier1.mockResolvedValue({
+    mockedScreenNonprofit.mockResolvedValue({
       success: true,
       data: tier1Result,
       attribution: "ProPublica Nonprofit Explorer API",
@@ -225,7 +225,7 @@ describe("VettingPipeline", () => {
 
   it("skips cache check when vettingStore is undefined", async () => {
     const tier1Result = makeScreeningResult();
-    mockedCheckTier1.mockResolvedValue({
+    mockedScreenNonprofit.mockResolvedValue({
       success: true,
       data: tier1Result,
       attribution: "ProPublica Nonprofit Explorer API",
@@ -238,6 +238,6 @@ describe("VettingPipeline", () => {
     const pipeline = new VettingPipeline(config);
     await pipeline.runScreening("12-3456789");
 
-    expect(mockedCheckTier1).toHaveBeenCalledOnce();
+    expect(mockedScreenNonprofit).toHaveBeenCalledOnce();
   });
 });

@@ -30,8 +30,8 @@ async function main() {
   console.log('Profile result:', JSON.stringify(profileResult, null, 2));
 
   // Test 3: Screening
-  console.log('\n3. Testing check_tier1...');
-  const tier1Result = await tools.checkTier1(client, { ein });
+  console.log('\n3. Testing screen_nonprofit...');
+  const tier1Result = await tools.screenNonprofit(client, { ein });
   console.log('Screening result:', JSON.stringify(tier1Result, null, 2));
 
   // Test 4: Get Red Flags
