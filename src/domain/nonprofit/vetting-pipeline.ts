@@ -2,7 +2,7 @@ import type { ProPublicaClient } from "./propublica-client.js";
 import type {
   VettingThresholds,
   PortfolioFitConfig,
-  Tier1Result,
+  ScreeningResult,
   ToolResponse,
 } from "./types.js";
 import type { VettingStore } from "../../data-sources/vetting-store.js";
@@ -23,20 +23,20 @@ export interface VettingPipelineConfig {
   cacheMaxAgeDays: number;
 }
 
-export interface RunTier1Options {
+export interface RunScreeningOptions {
   forceRefresh?: boolean;
 }
 
-export interface Tier1PipelineResult {
-  response: ToolResponse<Tier1Result>;
+export interface ScreeningPipelineResult {
+  response: ToolResponse<ScreeningResult>;
   cached: boolean;
   cachedNote?: string;
 }
 
-/**
- * VettingPipeline owns the cache-check → vet → persist lifecycle for Tier 1.
- * Calls the existing tools.checkTier1() internally — does NOT replace scoring logic.
- */
+// VettingPipeline orchestrates the full vetting lifecycle.
+// Currently, vetting = screening (automated financial checks).
+// As new layers are added (human review, impact analysis),
+// they become additional methods on this class.
 export class VettingPipeline {
   private config: VettingPipelineConfig;
 
@@ -44,10 +44,10 @@ export class VettingPipeline {
     this.config = config;
   }
 
-  async runTier1(
+  async runScreening(
     ein: string,
-    opts: RunTier1Options = {},
-  ): Promise<Tier1PipelineResult> {
+    opts: RunScreeningOptions = {},
+  ): Promise<ScreeningPipelineResult> {
     const { vettingStore } = this.config;
 
     // 1. Check cache (unless forceRefresh)
@@ -63,7 +63,7 @@ export class VettingPipeline {
           if (ageDays >= 0 && ageDays <= maxAge) {
             const cachedResult = JSON.parse(
               cached.result_json,
-            ) as Tier1Result;
+            ) as ScreeningResult;
             return {
               response: {
                 success: true,

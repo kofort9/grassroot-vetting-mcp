@@ -7,7 +7,7 @@ import {
   calculateScore,
   getRecommendation,
   detectRedFlags,
-  runTier1Checks,
+  runFullScreening,
   runRedFlagCheck,
 } from "../src/domain/nonprofit/scoring.js";
 import {
@@ -891,15 +891,15 @@ describe("detectRedFlags", () => {
 });
 
 // ============================================================================
-// runTier1Checks (integration)
+// runFullScreening (integration)
 // ============================================================================
 
-describe("runTier1Checks", () => {
+describe("runFullScreening", () => {
   it("returns PASS for a clean healthy profile", () => {
     const profile = makeProfile();
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(
+    const result = runFullScreening(
       profile,
       [makeFiling()],
       t,
@@ -915,7 +915,7 @@ describe("runTier1Checks", () => {
     expect(result.gates.all_passed).toBe(true);
     expect(result.red_flags).toHaveLength(0);
     expect(result.checks).toHaveLength(4);
-    expect(result.summary.headline).toBe("Approved for Tier 2 Vetting");
+    expect(result.summary.headline).toBe("Passes Financial Screening");
   });
 
   it("returns REJECT when IRS revocation gate fails", () => {
@@ -923,7 +923,7 @@ describe("runTier1Checks", () => {
     const irsClient = makeMockIrsClient();
     irsClient.check.mockReturnValue(makeRevokedIrsResult());
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(
+    const result = runFullScreening(
       profile,
       [makeFiling()],
       t,
@@ -943,7 +943,7 @@ describe("runTier1Checks", () => {
     const profile = makeProfile({ subsection: "04" });
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(
+    const result = runFullScreening(
       profile,
       [makeFiling()],
       t,
@@ -966,7 +966,7 @@ describe("runTier1Checks", () => {
     });
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(
+    const result = runFullScreening(
       profile,
       [],
       t,
@@ -987,7 +987,7 @@ describe("runTier1Checks", () => {
   it("has empty review_reasons for a clean PASS profile", () => {
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(
+    const result = runFullScreening(
       makeProfile(),
       [makeFiling()],
       t,
@@ -1003,7 +1003,7 @@ describe("runTier1Checks", () => {
     const profile = makeProfile({ years_operating: 2 });
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(
+    const result = runFullScreening(
       profile,
       [makeFiling()],
       t,
@@ -1025,7 +1025,7 @@ describe("runTier1Checks", () => {
     });
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(
+    const result = runFullScreening(
       profile,
       [makeFiling()],
       t,
@@ -1046,7 +1046,7 @@ describe("runTier1Checks", () => {
     });
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(
+    const result = runFullScreening(
       profile,
       [makeFiling()],
       t,
@@ -1065,7 +1065,7 @@ describe("runTier1Checks", () => {
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
     const courtResult = makeFlaggedCourtResult(3);
-    const result = runTier1Checks(
+    const result = runFullScreening(
       profile,
       [makeFiling()],
       t,
@@ -1084,7 +1084,7 @@ describe("runTier1Checks", () => {
     const profile = makeProfile({ subsection: "04" });
     const irsClient = makeMockIrsClient();
     const ofacClient = makeMockOfacClient();
-    const result = runTier1Checks(
+    const result = runFullScreening(
       profile,
       [makeFiling()],
       t,

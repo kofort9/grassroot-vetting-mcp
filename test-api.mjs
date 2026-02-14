@@ -29,10 +29,10 @@ async function main() {
   const profileResult = await tools.getNonprofitProfile(client, { ein });
   console.log('Profile result:', JSON.stringify(profileResult, null, 2));
 
-  // Test 3: Check Tier 1
+  // Test 3: Screening
   console.log('\n3. Testing check_tier1...');
   const tier1Result = await tools.checkTier1(client, { ein });
-  console.log('Tier 1 result:', JSON.stringify(tier1Result, null, 2));
+  console.log('Screening result:', JSON.stringify(tier1Result, null, 2));
 
   // Test 4: Get Red Flags
   console.log('\n4. Testing get_red_flags...');

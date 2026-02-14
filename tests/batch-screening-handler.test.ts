@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getToolDefinitions } from "../src/server/nonprofit-tools.js";
-import { makeTier1Result } from "./fixtures.js";
+import { makeScreeningResult } from "./fixtures.js";
 import type { ServerContext } from "../src/server/context.js";
 import type { ToolDefinition } from "../src/server/tool-registry.js";
 
@@ -34,7 +34,7 @@ function makeMockCtx(
     courtClient: undefined,
     vettingStore: {} as ServerContext["vettingStore"],
     vettingPipeline: {
-      runTier1: vi.fn(),
+      runScreening: vi.fn(),
     } as unknown as ServerContext["vettingPipeline"],
     searchHistoryStore: {
       logSearch: vi.fn(),
@@ -89,11 +89,11 @@ describe("batch_tier1 handler", () => {
 
   it("returns compact output by default", async () => {
     const ctx = makeMockCtx();
-    const mockRunTier1 = vi.mocked(ctx.vettingPipeline.runTier1);
+    const mockRunTier1 = vi.mocked(ctx.vettingPipeline.runScreening);
     mockRunTier1.mockResolvedValueOnce({
       response: {
         success: true,
-        data: makeTier1Result({ ein: "12-3456789", recommendation: "PASS", score: 85 }),
+        data: makeScreeningResult({ ein: "12-3456789", recommendation: "PASS", score: 85 }),
         attribution: "test",
       },
       cached: false,
@@ -113,11 +113,11 @@ describe("batch_tier1 handler", () => {
 
   it("returns verbose output when verbose=true", async () => {
     const ctx = makeMockCtx();
-    const mockRunTier1 = vi.mocked(ctx.vettingPipeline.runTier1);
+    const mockRunTier1 = vi.mocked(ctx.vettingPipeline.runScreening);
     mockRunTier1.mockResolvedValueOnce({
       response: {
         success: true,
-        data: makeTier1Result({ ein: "12-3456789" }),
+        data: makeScreeningResult({ ein: "12-3456789" }),
         attribution: "test",
       },
       cached: false,
@@ -127,20 +127,20 @@ describe("batch_tier1 handler", () => {
     const result = await tool.handler({ eins: ["12-3456789"], verbose: true }, ctx);
     const parsed = parseResponse(result);
 
-    // Verbose should include full Tier1Result fields
+    // Verbose should include full ScreeningResult fields
     expect(parsed.data.results[0].result).toHaveProperty("gates");
     expect(parsed.data.results[0].result).toHaveProperty("checks");
   });
 
   it("aggregates stats correctly across mixed results", async () => {
     const ctx = makeMockCtx();
-    const mockRunTier1 = vi.mocked(ctx.vettingPipeline.runTier1);
+    const mockRunTier1 = vi.mocked(ctx.vettingPipeline.runScreening);
 
     mockRunTier1
       .mockResolvedValueOnce({
         response: {
           success: true,
-          data: makeTier1Result({ ein: "11-1111111", recommendation: "PASS" }),
+          data: makeScreeningResult({ ein: "11-1111111", recommendation: "PASS" }),
           attribution: "test",
         },
         cached: true,
@@ -149,7 +149,7 @@ describe("batch_tier1 handler", () => {
       .mockResolvedValueOnce({
         response: {
           success: true,
-          data: makeTier1Result({ ein: "22-2222222", recommendation: "REVIEW", score: 60 }),
+          data: makeScreeningResult({ ein: "22-2222222", recommendation: "REVIEW", score: 60 }),
           attribution: "test",
         },
         cached: false,
@@ -158,7 +158,7 @@ describe("batch_tier1 handler", () => {
       .mockResolvedValueOnce({
         response: {
           success: true,
-          data: makeTier1Result({ ein: "33-3333333", recommendation: "REJECT", score: 30, passed: false }),
+          data: makeScreeningResult({ ein: "33-3333333", recommendation: "REJECT", score: 30, passed: false }),
           attribution: "test",
         },
         cached: false,
@@ -194,13 +194,13 @@ describe("batch_tier1 handler", () => {
 
   it("wraps thrown errors per-EIN without crashing the batch", async () => {
     const ctx = makeMockCtx();
-    const mockRunTier1 = vi.mocked(ctx.vettingPipeline.runTier1);
+    const mockRunTier1 = vi.mocked(ctx.vettingPipeline.runScreening);
 
     mockRunTier1
       .mockResolvedValueOnce({
         response: {
           success: true,
-          data: makeTier1Result({ ein: "11-1111111" }),
+          data: makeScreeningResult({ ein: "11-1111111" }),
           attribution: "test",
         },
         cached: false,
@@ -231,7 +231,7 @@ describe("check_tier1 handler error ordering", () => {
 
   it("returns error response when pipeline returns success=false", async () => {
     const ctx = makeMockCtx();
-    const mockRunTier1 = vi.mocked(ctx.vettingPipeline.runTier1);
+    const mockRunTier1 = vi.mocked(ctx.vettingPipeline.runScreening);
     mockRunTier1.mockResolvedValueOnce({
       response: {
         success: false,
@@ -252,12 +252,12 @@ describe("check_tier1 handler error ordering", () => {
 
   it("returns error when response has error string even if success is true", async () => {
     const ctx = makeMockCtx();
-    const mockRunTier1 = vi.mocked(ctx.vettingPipeline.runTier1);
+    const mockRunTier1 = vi.mocked(ctx.vettingPipeline.runScreening);
     mockRunTier1.mockResolvedValueOnce({
       response: {
         success: true,
         error: "Partial failure: court records unavailable",
-        data: makeTier1Result({ ein: "12-3456789" }),
+        data: makeScreeningResult({ ein: "12-3456789" }),
         attribution: "test",
       },
       cached: false,

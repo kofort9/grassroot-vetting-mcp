@@ -1,11 +1,11 @@
-# Scoring Methodology: How Tier 1 Vetting Works
+# Scoring Methodology: How Financial Screening Works
 
 <!-- Linear doc ID: fb990ce6-a80a-41b0-9de5-17db73eb2a67 -->
 <!-- To push back to Linear: update_document with this content (strip this comment block) -->
 
 Every nonprofit that enters the Bonsaei directory goes through an automated screening pipeline. This doc explains how it works at a practical level — what we check, how we score, and what the results mean.
 
-For the full technical spec (field names, code paths, API sources), see **Vetting Criteria: Tier 1 — Automated Screening**. *(Note: the technical spec is being updated to match this document — if numbers conflict, this document is authoritative.)*
+For the full technical spec (field names, code paths, API sources), see **Vetting Criteria: Automated Financial Screening**. *(Note: the technical spec is being updated to match this document — if numbers conflict, this document is authoritative.)*
 
 ---
 
@@ -157,7 +157,7 @@ Net effect: the pipeline is more likely to surface small, well-run orgs for the 
 
 These are accepted trade-offs for V1, not bugs:
 
-1. **All scoring data is self-reported** — Every scoring check and most red flags derive from a single source: the IRS Form 990, which is filed by the nonprofit itself. There is no independent verification of financial figures. The IRS rarely audits small nonprofits, so a bad actor who maintains filing compliance for 3+ years and reports plausible numbers can produce any desired score. This is the fundamental limitation of Tier 1 automation — it filters out obviously problematic orgs, but cannot catch sophisticated fraud. That is what Tier 2 (manual review, external data sources) is for.
+1. **All scoring data is self-reported** — Every scoring check and most red flags derive from a single source: the IRS Form 990, which is filed by the nonprofit itself. There is no independent verification of financial figures. The IRS rarely audits small nonprofits, so a bad actor who maintains filing compliance for 3+ years and reports plausible numbers can produce any desired score. This is the fundamental limitation of automated screening — it filters out obviously problematic orgs, but cannot catch sophisticated fraud. That is what manual review (external data sources, site visits) is for.
 2. **Weight calibration (10/25/35/30)** — Check weights are based on signal-strength reasoning, not empirical data. Spend rate (35) and 990 recency (30) are weighted highest because they most directly indicate financial health and data confidence. After ~300 manual reviews, we will run a logistic regression of review outcomes against check scores to validate or refine these weights.
 3. **Spend rate ≠ true overhead** — ProPublica reports total functional expenses vs. total revenue. It doesn't separate program expenses from admin/fundraising. A high spend rate could mean great program delivery or bloated overhead — we can't tell from 990 summary data alone. Note: within the 60–130% pass band, all spend rates earn the same score — a 65% ratio and a 125% ratio both get full marks.
 4. **NTEE codes are approximate** — IRS NTEE classification codes are ~15-20% miscoded in practice (source: IRS classification via ProPublica, no independent verification). The cause area filter in the directory is useful but not authoritative. Sector-adjusted thresholds inherit this limitation — an org miscoded into the wrong NTEE category gets the wrong sector override.

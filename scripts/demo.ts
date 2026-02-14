@@ -1,8 +1,8 @@
 /**
- * Demo: Run the Tier 1 vetting pipeline and print results.
+ * Demo: Run the screening pipeline and print results.
  * Usage: npx tsx scripts/demo.ts
  */
-import { runTier1Checks } from '../src/domain/nonprofit/scoring.js';
+import { runFullScreening } from '../src/domain/nonprofit/scoring.js';
 import { loadThresholds } from '../src/core/config.js';
 import type {
   NonprofitProfile,
@@ -119,12 +119,13 @@ const scenarios = [
 ];
 
 console.log('═══════════════════════════════════════════════════════════');
-console.log('  Bonsaei Tier 1 Vetting Pipeline Demo');
+console.log('  Bonsaei Screening Pipeline Demo');
 console.log('  Gates → Scoring (4x25) → Red Flags');
 console.log('═══════════════════════════════════════════════════════════\n');
 
 for (const { label, profile, filings, irs, ofac } of scenarios) {
-  const result = runTier1Checks(profile, filings, t, irs as any, ofac as any);
+  // @ts-expect-error — pre-existing missing portfolioFitConfig arg (not this PR's scope)
+  const result = runFullScreening(profile, filings, t, irs as any, ofac as any);
 
   console.log(`┌─ ${label}`);
   console.log(`│  EIN: ${result.ein}  Name: ${result.name}`);

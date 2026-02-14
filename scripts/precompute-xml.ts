@@ -69,7 +69,7 @@ async function main(): Promise<void> {
     vettingDb = SqliteDatabase.open(vettingDbPath);
   } catch (err) {
     console.error(`Cannot open vetting.db at ${vettingDbPath}: ${err}`);
-    console.error("Run the Tier 1 precompute first.");
+    console.error("Run the screening precompute first.");
     process.exit(1);
   }
 

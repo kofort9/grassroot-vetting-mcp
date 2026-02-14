@@ -1,13 +1,13 @@
 import type {
-  Tier1Result,
+  ScreeningResult,
   RedFlagResult,
   CourtCaseSummary,
 } from "../domain/nonprofit/types.js";
 
 /**
- * Compact tier1 output — just the decision-relevant fields.
+ * Compact screening output — just the decision-relevant fields.
  */
-export interface CompactTier1 {
+export interface CompactScreening {
   ein: string;
   name: string;
   recommendation: "PASS" | "REVIEW" | "REJECT";
@@ -37,7 +37,7 @@ export interface CompactRedFlags {
   }>;
 }
 
-export function compactTier1(result: Tier1Result): CompactTier1 {
+export function compactScreening(result: ScreeningResult): CompactScreening {
   return {
     ein: result.ein,
     name: result.name,

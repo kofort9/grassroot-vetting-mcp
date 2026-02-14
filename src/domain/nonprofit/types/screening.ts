@@ -1,10 +1,20 @@
-// Tier 1 Check Types
+// Screening & Criterion Types
+//
+// CriterionCheck — individual criterion evaluation (inputs to scoring)
+// ScreeningResult — full pipeline output (gates + scoring + red flags)
+//
+// "Screening" here refers to the full automated screening pipeline,
+// NOT just the gate/pre-screen layer. Gate types live in gates/gate-types.ts.
+//
+// Naming: "Screening" reflects automated financial checks against 990 data.
+// Future deep-dive types will use "Review" or "DueDiligence" naming
+// to distinguish human-led analysis from automated screening.
 
 import type { RedFlag } from "./red-flags.js";
 
 export type CheckResult = "PASS" | "REVIEW" | "FAIL";
 
-export interface Tier1Check {
+export interface CriterionCheck {
   name: string;
   passed: boolean;
   result: CheckResult;
@@ -12,22 +22,22 @@ export interface Tier1Check {
   weight: number;
 }
 
-export interface Tier1Summary {
+export interface ScreeningSummary {
   headline: string;
   justification: string;
   key_factors: string[]; // Prefixed: "+" positive, "-" negative, "~" neutral/warning
   next_steps: string[];
 }
 
-export interface Tier1Result {
+export interface ScreeningResult {
   ein: string;
   name: string;
   passed: boolean;
   gates: import("../../gates/gate-types.js").GateLayerResult;
   gate_blocked: boolean;
   score: number | null; // null when gate-blocked
-  summary: Tier1Summary;
-  checks: Tier1Check[] | null; // null when gate-blocked
+  summary: ScreeningSummary;
+  checks: CriterionCheck[] | null; // null when gate-blocked
   recommendation: "PASS" | "REVIEW" | "REJECT";
   review_reasons: string[];
   red_flags: RedFlag[];

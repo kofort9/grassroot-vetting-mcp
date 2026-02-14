@@ -29,7 +29,7 @@ const eins = [
   { label: '360 Grassroots', ein: '27-2657135' },
 ];
 
-console.log('=== Tier 1 Vetting Results ===\n');
+console.log('=== Screening Results ===\n');
 
 for (const { label, ein } of eins) {
   try {

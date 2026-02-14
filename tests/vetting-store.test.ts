@@ -3,7 +3,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { VettingStore } from "../src/data-sources/vetting-store.js";
-import { makeTier1Result } from "./fixtures.js";
+import { makeScreeningResult } from "./fixtures.js";
 import { ensureSqlJs } from "../src/data-sources/sqlite-adapter.js";
 
 function makeTempDir(): string {
@@ -36,7 +36,7 @@ describe("VettingStore", () => {
 
   it("saveResult() inserts and returns record", () => {
     store.initialize();
-    const result = makeTier1Result();
+    const result = makeScreeningResult();
     const record = store.saveResult(result);
 
     expect(record.id).toBe(1);
@@ -54,7 +54,7 @@ describe("VettingStore", () => {
 
   it("saveResult() normalizes EIN (strips hyphens)", () => {
     store.initialize();
-    const result = makeTier1Result({ ein: "12-3456789" });
+    const result = makeScreeningResult({ ein: "12-3456789" });
     const record = store.saveResult(result);
 
     expect(record.ein).toBe("123456789");
@@ -72,10 +72,10 @@ describe("VettingStore", () => {
 
     // Save two results for the same EIN
     store.saveResult(
-      makeTier1Result({ ein, score: 70, recommendation: "REVIEW" }),
+      makeScreeningResult({ ein, score: 70, recommendation: "REVIEW" }),
     );
     store.saveResult(
-      makeTier1Result({ ein, score: 90, recommendation: "PASS" }),
+      makeScreeningResult({ ein, score: 90, recommendation: "PASS" }),
     );
 
     const latest = store.getLatestByEin(ein);
@@ -86,7 +86,7 @@ describe("VettingStore", () => {
 
   it("getLatestByEin() normalizes input EIN", () => {
     store.initialize();
-    store.saveResult(makeTier1Result({ ein: "12-3456789" }));
+    store.saveResult(makeScreeningResult({ ein: "12-3456789" }));
 
     // Look up with different format
     const record = store.getLatestByEin("123456789");
@@ -97,9 +97,9 @@ describe("VettingStore", () => {
   it("listVetted() returns all results, newest first", () => {
     store.initialize();
 
-    store.saveResult(makeTier1Result({ ein: "111111111", name: "First" }));
-    store.saveResult(makeTier1Result({ ein: "222222222", name: "Second" }));
-    store.saveResult(makeTier1Result({ ein: "333333333", name: "Third" }));
+    store.saveResult(makeScreeningResult({ ein: "111111111", name: "First" }));
+    store.saveResult(makeScreeningResult({ ein: "222222222", name: "Second" }));
+    store.saveResult(makeScreeningResult({ ein: "333333333", name: "Third" }));
 
     const results = store.listVetted();
     expect(results).toHaveLength(3);
@@ -111,9 +111,9 @@ describe("VettingStore", () => {
   it("listVetted({ recommendation }) filters correctly", () => {
     store.initialize();
 
-    store.saveResult(makeTier1Result({ recommendation: "PASS", score: 85 }));
+    store.saveResult(makeScreeningResult({ recommendation: "PASS", score: 85 }));
     store.saveResult(
-      makeTier1Result({
+      makeScreeningResult({
         ein: "222222222",
         recommendation: "REVIEW",
         score: 60,
@@ -121,7 +121,7 @@ describe("VettingStore", () => {
       }),
     );
     store.saveResult(
-      makeTier1Result({
+      makeScreeningResult({
         ein: "333333333",
         recommendation: "REJECT",
         score: 30,
@@ -141,7 +141,7 @@ describe("VettingStore", () => {
   it("listVetted({ since }) filters by date", () => {
     store.initialize();
 
-    store.saveResult(makeTier1Result({ ein: "111111111" }));
+    store.saveResult(makeScreeningResult({ ein: "111111111" }));
 
     // All results are "now", so filtering with a far-future date should return nothing
     const futureResults = store.listVetted({ since: "2099-01-01" });
@@ -158,7 +158,7 @@ describe("VettingStore", () => {
     // Insert 5 records
     for (let i = 0; i < 5; i++) {
       store.saveResult(
-        makeTier1Result({ ein: String(100000000 + i), name: `Org ${i}` }),
+        makeScreeningResult({ ein: String(100000000 + i), name: `Org ${i}` }),
       );
     }
 
@@ -173,16 +173,16 @@ describe("VettingStore", () => {
   it("getStats() returns correct counts", () => {
     store.initialize();
 
-    store.saveResult(makeTier1Result({ recommendation: "PASS", score: 85 }));
+    store.saveResult(makeScreeningResult({ recommendation: "PASS", score: 85 }));
     store.saveResult(
-      makeTier1Result({
+      makeScreeningResult({
         ein: "222222222",
         recommendation: "PASS",
         score: 80,
       }),
     );
     store.saveResult(
-      makeTier1Result({
+      makeScreeningResult({
         ein: "333333333",
         recommendation: "REVIEW",
         score: 60,
@@ -190,7 +190,7 @@ describe("VettingStore", () => {
       }),
     );
     store.saveResult(
-      makeTier1Result({
+      makeScreeningResult({
         ein: "444444444",
         recommendation: "REJECT",
         score: 30,
@@ -214,7 +214,7 @@ describe("VettingStore", () => {
 
   it("listVetted({ limit }) clamps negative values to 1", () => {
     store.initialize();
-    store.saveResult(makeTier1Result({ ein: "111111111" }));
+    store.saveResult(makeScreeningResult({ ein: "111111111" }));
 
     const results = store.listVetted({ limit: -5 });
     expect(results).toHaveLength(1);

@@ -1,6 +1,6 @@
 # Grassroot Vetting MCP Server
 
-An MCP (Model Context Protocol) server for automated **grassroots nonprofit vetting** using the ProPublica Nonprofit Explorer API and IRS Business Master File. Implements Tier 1 automated checks from a VC-style nonprofit vetting framework.
+An MCP (Model Context Protocol) server for automated **grassroots nonprofit vetting** using the ProPublica Nonprofit Explorer API and IRS Business Master File. Implements automated financial screening from a VC-style nonprofit vetting framework.
 
 ## Grassroots Focus
 
@@ -15,14 +15,14 @@ This tool targets **grassroots and community-based nonprofits** ($100K-$10M reve
 ### Vetting (ProPublica Nonprofit Explorer)
 - **search_nonprofit** - Search for nonprofits by name, with optional state/city filters
 - **get_nonprofit_profile** - Get detailed profile including 990 financial summary
-- **check_tier1** - Run automated Tier 1 vetting: pre-screen gates → scoring engine → red flag overlay
+- **check_tier1** - Run automated financial screening: pre-screen gates → scoring engine → red flag overlay
 - **get_red_flags** - Identify warning signs and issues
 
 ### Tracking
 - **list_vetted** - List previously vetted nonprofits with summary stats. Filter by recommendation or date.
 - **refresh_data** - Re-download IRS revocation list and/or OFAC SDN data
 
-## How Tier 1 Works
+## How Screening Works
 
 `check_tier1` runs three layers in sequence:
 
@@ -123,7 +123,7 @@ discover_nonprofits(state: "CA", city: "Oakland", ntee_categories: ["B"], limit:
 check_tier1(ein: "942881684")
 → PASS (88/100) — 43 years operating, $2.3M revenue, 13 filings
 → One flag: expense ratio 100.6% (spending slightly exceeds revenue)
-→ Approved for Tier 2 deep-dive
+→ Passes financial screening
 ```
 
 ### 2. Gate rejection — org can't be evaluated
@@ -184,7 +184,7 @@ discover_nonprofits(state: "GA", ntee_categories: ["B", "P"], limit: 100)
 # Vet each candidate individually via check_tier1
 
 list_vetted(recommendation: "PASS")
-→ See all orgs that cleared Tier 1
+→ See all orgs that passed screening
 ```
 
 ### Discovery Filter Reference
@@ -309,7 +309,7 @@ Get detailed profile for a nonprofit.
 
 ### check_tier1
 
-Run Tier 1 vetting checks.
+Run automated financial screening checks.
 
 **Input:**
 ```typescript

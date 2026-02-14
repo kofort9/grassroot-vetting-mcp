@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { VettingPipeline } from "../src/domain/nonprofit/vetting-pipeline.js";
-import { makeTier1Result } from "./fixtures.js";
+import { makeScreeningResult } from "./fixtures.js";
 import type { VettingPipelineConfig } from "../src/domain/nonprofit/vetting-pipeline.js";
 
 // Mock the tools module
@@ -51,7 +51,7 @@ describe("VettingPipeline", () => {
   });
 
   it("returns fresh result on cache miss", async () => {
-    const tier1Result = makeTier1Result({ ein: "12-3456789" });
+    const tier1Result = makeScreeningResult({ ein: "12-3456789" });
     mockedCheckTier1.mockResolvedValue({
       success: true,
       data: tier1Result,
@@ -60,7 +60,7 @@ describe("VettingPipeline", () => {
 
     const config = makeMockConfig();
     const pipeline = new VettingPipeline(config);
-    const { response, cached } = await pipeline.runTier1("12-3456789");
+    const { response, cached } = await pipeline.runScreening("12-3456789");
 
     expect(cached).toBe(false);
     expect(response.success).toBe(true);
@@ -69,7 +69,7 @@ describe("VettingPipeline", () => {
   });
 
   it("returns cached result on cache hit (within TTL)", async () => {
-    const tier1Result = makeTier1Result({ ein: "12-3456789" });
+    const tier1Result = makeScreeningResult({ ein: "12-3456789" });
     const recentDate = daysAgo(5);
     const config = makeMockConfig({
       vettingStore: {
@@ -84,7 +84,7 @@ describe("VettingPipeline", () => {
 
     const pipeline = new VettingPipeline(config);
     const { response, cached, cachedNote } =
-      await pipeline.runTier1("12-3456789");
+      await pipeline.runScreening("12-3456789");
 
     expect(cached).toBe(true);
     expect(response.success).toBe(true);
@@ -94,7 +94,7 @@ describe("VettingPipeline", () => {
   });
 
   it("auto-refreshes when cached result exceeds TTL", async () => {
-    const tier1Result = makeTier1Result({ ein: "12-3456789" });
+    const tier1Result = makeScreeningResult({ ein: "12-3456789" });
     mockedCheckTier1.mockResolvedValue({
       success: true,
       data: tier1Result,
@@ -114,14 +114,14 @@ describe("VettingPipeline", () => {
     });
 
     const pipeline = new VettingPipeline(config);
-    const { cached } = await pipeline.runTier1("12-3456789");
+    const { cached } = await pipeline.runScreening("12-3456789");
 
     expect(cached).toBe(false);
     expect(mockedCheckTier1).toHaveBeenCalledOnce();
   });
 
   it("respects custom cacheMaxAgeDays", async () => {
-    const tier1Result = makeTier1Result({ ein: "12-3456789" });
+    const tier1Result = makeScreeningResult({ ein: "12-3456789" });
     mockedCheckTier1.mockResolvedValue({
       success: true,
       data: tier1Result,
@@ -142,7 +142,7 @@ describe("VettingPipeline", () => {
     });
 
     const pipeline = new VettingPipeline(config);
-    const { cached } = await pipeline.runTier1("12-3456789");
+    const { cached } = await pipeline.runScreening("12-3456789");
 
     // 10 days old > 7-day TTL → should re-vet
     expect(cached).toBe(false);
@@ -150,7 +150,7 @@ describe("VettingPipeline", () => {
   });
 
   it("bypasses cache when forceRefresh is true", async () => {
-    const tier1Result = makeTier1Result({ ein: "12-3456789" });
+    const tier1Result = makeScreeningResult({ ein: "12-3456789" });
     mockedCheckTier1.mockResolvedValue({
       success: true,
       data: tier1Result,
@@ -169,7 +169,7 @@ describe("VettingPipeline", () => {
     });
 
     const pipeline = new VettingPipeline(config);
-    const { cached } = await pipeline.runTier1("12-3456789", {
+    const { cached } = await pipeline.runScreening("12-3456789", {
       forceRefresh: true,
     });
 
@@ -178,7 +178,7 @@ describe("VettingPipeline", () => {
   });
 
   it("persists result on success", async () => {
-    const tier1Result = makeTier1Result();
+    const tier1Result = makeScreeningResult();
     mockedCheckTier1.mockResolvedValue({
       success: true,
       data: tier1Result,
@@ -194,13 +194,13 @@ describe("VettingPipeline", () => {
     });
 
     const pipeline = new VettingPipeline(config);
-    await pipeline.runTier1("12-3456789");
+    await pipeline.runScreening("12-3456789");
 
     expect(saveResult).toHaveBeenCalledWith(tier1Result);
   });
 
   it("does not throw when persistence fails", async () => {
-    const tier1Result = makeTier1Result();
+    const tier1Result = makeScreeningResult();
     mockedCheckTier1.mockResolvedValue({
       success: true,
       data: tier1Result,
@@ -217,14 +217,14 @@ describe("VettingPipeline", () => {
     });
 
     const pipeline = new VettingPipeline(config);
-    const { response } = await pipeline.runTier1("12-3456789");
+    const { response } = await pipeline.runScreening("12-3456789");
 
     // Should still return success despite persistence failure
     expect(response.success).toBe(true);
   });
 
   it("skips cache check when vettingStore is undefined", async () => {
-    const tier1Result = makeTier1Result();
+    const tier1Result = makeScreeningResult();
     mockedCheckTier1.mockResolvedValue({
       success: true,
       data: tier1Result,
@@ -236,7 +236,7 @@ describe("VettingPipeline", () => {
     });
 
     const pipeline = new VettingPipeline(config);
-    await pipeline.runTier1("12-3456789");
+    await pipeline.runScreening("12-3456789");
 
     expect(mockedCheckTier1).toHaveBeenCalledOnce();
   });

@@ -304,7 +304,7 @@ describe("checkTier1", () => {
     expect(result.error).toContain("not found");
   });
 
-  it("returns Tier1Result on success", async () => {
+  it("returns ScreeningResult on success", async () => {
     (client.getOrganization as ReturnType<typeof vi.fn>).mockResolvedValue(
       makeOrgResponse(),
     );

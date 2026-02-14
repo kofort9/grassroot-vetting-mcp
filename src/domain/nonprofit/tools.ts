@@ -4,7 +4,7 @@ import {
   NonprofitSearchResult,
   SearchNonprofitResponse,
   ToolResponse,
-  Tier1Result,
+  ScreeningResult,
   RedFlagResult,
   Latest990Summary,
   VettingThresholds,
@@ -13,7 +13,7 @@ import {
   CourtRecordsResult,
   PortfolioFitConfig,
 } from "./types.js";
-import { runTier1Checks, runRedFlagCheck } from "./scoring.js";
+import { runFullScreening, runRedFlagCheck } from "./scoring.js";
 import { resolveThresholds } from "./sector-thresholds.js";
 import { logDebug, logError } from "../../core/logging.js";
 import type { IrsRevocationClient } from "../red-flags/irs-revocation-client.js";
@@ -247,7 +247,10 @@ export async function getNonprofitProfile(
 }
 
 /**
- * check_tier1 - Run Tier 1 vetting checks (gates → scoring → red flags)
+ * check_tier1 - Run screening checks (gates → scoring → red flags)
+ *
+ * NOTE: Function name stays as checkTier1() to match MCP tool name.
+ * Will rename to screenNonprofit() in Phase 2 when tool name changes.
  */
 export async function checkTier1(
   client: ProPublicaClient,
@@ -257,7 +260,7 @@ export async function checkTier1(
   ofacClient: OfacSdnClient,
   portfolioFitConfig: PortfolioFitConfig,
   courtClient?: CourtListenerClient,
-): Promise<ToolResponse<Tier1Result>> {
+): Promise<ToolResponse<ScreeningResult>> {
   return withEinLookup(
     client,
     input.ein,
@@ -274,7 +277,7 @@ export async function checkTier1(
           );
         }
       }
-      return runTier1Checks(
+      return runFullScreening(
         profile,
         filings,
         resolveThresholds(thresholds, profile.ntee_code),

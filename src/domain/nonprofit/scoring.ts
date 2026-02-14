@@ -1,7 +1,7 @@
 import {
   NonprofitProfile,
-  Tier1Check,
-  Tier1Result,
+  CriterionCheck,
+  ScreeningResult,
   CheckResult,
   RedFlag,
   RedFlagResult,
@@ -18,7 +18,7 @@ import type { OfacSdnClient } from "../red-flags/ofac-sdn-client.js";
 import { runPreScreenGates } from "../gates/gate-runner.js";
 
 // ============================================================================
-// Tier 1 Individual Check Functions (4 checks, 501c3 moved to gate layer)
+// Criterion Check Functions (4 checks, 501c3 moved to gate layer)
 // ============================================================================
 
 /**
@@ -30,7 +30,7 @@ import { runPreScreenGates } from "../gates/gate-runner.js";
 export function checkYearsOperating(
   profile: NonprofitProfile,
   t: VettingThresholds,
-): Tier1Check {
+): CriterionCheck {
   const years = profile.years_operating;
 
   let result: CheckResult;
@@ -68,7 +68,7 @@ export function checkYearsOperating(
 export function checkRevenueRange(
   profile: NonprofitProfile,
   t: VettingThresholds,
-): Tier1Check {
+): CriterionCheck {
   const revenue = profile.latest_990?.total_revenue;
 
   let result: CheckResult;
@@ -120,7 +120,7 @@ export function checkRevenueRange(
 export function checkSpendRate(
   profile: NonprofitProfile,
   t: VettingThresholds,
-): Tier1Check {
+): CriterionCheck {
   const ratio = profile.latest_990?.overhead_ratio;
 
   let result: CheckResult;
@@ -170,7 +170,7 @@ export function checkSpendRate(
 export function checkRecent990(
   profile: NonprofitProfile,
   t: VettingThresholds,
-): Tier1Check {
+): CriterionCheck {
   const taxPeriod = profile.latest_990?.tax_period;
 
   let result: CheckResult;
@@ -214,7 +214,7 @@ export function checkRecent990(
  * Calculate overall score from checks
  * PASS = full points, REVIEW = 50% points, FAIL = 0 points
  */
-export function calculateScore(checks: Tier1Check[]): number {
+export function calculateScore(checks: CriterionCheck[]): number {
   let score = 0;
 
   for (const check of checks) {
@@ -437,7 +437,7 @@ export function detectRedFlags(
 }
 
 // ============================================================================
-// Scoring-Only Helper (used by runTier1Checks)
+// Scoring-Only Helper (used by runFullScreening)
 // ============================================================================
 
 /**
@@ -447,8 +447,8 @@ export function detectRedFlags(
 export function runScoringChecks(
   profile: NonprofitProfile,
   t: VettingThresholds,
-): { checks: Tier1Check[]; score: number } {
-  const checks: Tier1Check[] = [
+): { checks: CriterionCheck[]; score: number } {
+  const checks: CriterionCheck[] = [
     checkYearsOperating(profile, t),
     checkRevenueRange(profile, t),
     checkSpendRate(profile, t),
@@ -460,15 +460,15 @@ export function runScoringChecks(
 }
 
 // ============================================================================
-// Main Tier 1 Check Function
+// Main Screening Function
 // ============================================================================
 
 /**
- * Run full Tier 1 pipeline: gates → scoring → red flags.
+ * Run full screening pipeline: gates → scoring → red flags.
  *
  * If gates block, returns REJECT with null score/checks.
  */
-export function runTier1Checks(
+export function runFullScreening(
   profile: NonprofitProfile,
   filings: ProPublica990Filing[] | undefined,
   t: VettingThresholds,
@@ -476,7 +476,7 @@ export function runTier1Checks(
   ofacClient: OfacSdnClient,
   portfolioFitConfig: PortfolioFitConfig,
   courtResult?: CourtRecordsResult,
-): Tier1Result {
+): ScreeningResult {
   // Layer 1: Pre-screen gates
   const gateResult = runPreScreenGates(
     profile,
@@ -577,7 +577,7 @@ export function runRedFlagCheck(
  * Used by the Bonsaei dashboard to show "why this recommendation?" context.
  */
 function buildReviewReasons(
-  checks: Tier1Check[],
+  checks: CriterionCheck[],
   redFlags: RedFlag[],
 ): string[] {
   const reasons: string[] = [];

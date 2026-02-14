@@ -1,6 +1,6 @@
 import {
-  Tier1Check,
-  Tier1Summary,
+  CriterionCheck,
+  ScreeningSummary,
   RedFlag,
   CheckResult,
   RedFlagType,
@@ -8,16 +8,16 @@ import {
 import type { GateCheckResult } from "../gates/gate-types.js";
 
 // ============================================================================
-// Tier 1 Verdict Configuration
+// Screening Verdict Configuration
 // ============================================================================
 
 export const VERDICT_CONFIG = {
   PASS: {
-    headline: "Approved for Tier 2 Vetting",
+    headline: "Passes Financial Screening",
     template:
-      "Organization meets Tier 1 criteria with a score of {{score}}/100. {{name}} is a verified 501(c)(3) with {{years}} years of operating history and healthy financials.",
+      "Organization passes financial screening. {{name}} is a verified 501(c)(3) with {{years}} years of operating history and healthy financials.",
     next_steps: [
-      "Proceed to Tier 2 deep-dive vetting",
+      "This screening covers financial health only — verify program impact independently",
       "Review program effectiveness and impact metrics",
       "Verify leadership and governance structure",
     ],
@@ -33,9 +33,9 @@ export const VERDICT_CONFIG = {
     ],
   },
   REJECT: {
-    headline: "Does Not Meet Criteria",
+    headline: "Does Not Meet Screening Criteria",
     template:
-      "Organization does not meet minimum Tier 1 criteria (score: {{score}}/100). {{issues_summary}}",
+      "Organization does not meet minimum screening criteria (score: {{score}}/100). {{issues_summary}}",
     next_steps: [
       "Do not proceed with funding consideration",
       "Document rejection reason for records",
@@ -103,10 +103,10 @@ export function generateSummary(
   name: string,
   score: number,
   recommendation: "PASS" | "REVIEW" | "REJECT",
-  checks: Tier1Check[],
+  checks: CriterionCheck[],
   redFlags: RedFlag[],
   yearsOperating: number | null,
-): Tier1Summary {
+): ScreeningSummary {
   const config = VERDICT_CONFIG[recommendation];
 
   // Build key factors from checks
@@ -166,13 +166,13 @@ export function generateSummary(
 // ============================================================================
 
 /**
- * Build a Tier1Summary for gate-blocked results (no score to show).
+ * Build a ScreeningSummary for gate-blocked results (no score to show).
  */
 export function generateGateFailureSummary(
   name: string,
   blockingGate: string,
   gates: GateCheckResult[],
-): Tier1Summary {
+): ScreeningSummary {
   const gateLabels: Record<string, string> = {
     verified_501c3: "501(c)(3) verification",
     ofac_sanctions: "OFAC sanctions check",
@@ -187,7 +187,7 @@ export function generateGateFailureSummary(
   });
 
   return {
-    headline: "Does Not Meet Criteria — Pre-Screen Gate Failure",
+    headline: "Not Eligible for Listing — Pre-Screen Gate Failure",
     justification: `${name} failed pre-screen gate: ${gateLabel}. Organization was rejected before scoring.`,
     key_factors: keyFactors,
     next_steps: [

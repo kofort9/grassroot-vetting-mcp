@@ -11,7 +11,7 @@ import type {
   OfacSanctionsResult,
   CourtListenerCase,
   CourtRecordsResult,
-  Tier1Result,
+  ScreeningResult,
   GtFilingIndexEntry,
   GivingTuesdayConfig,
   Xml990ExtractedData,
@@ -81,7 +81,7 @@ export function make990(
 }
 
 /**
- * Build a healthy nonprofit profile that passes all Tier 1 checks.
+ * Build a healthy nonprofit profile that passes all screening checks.
  * Override any fields to create specific test scenarios.
  */
 export function makeProfile(
@@ -300,10 +300,10 @@ export function makePortfolioFitConfig(
 }
 
 // ============================================================================
-// Tier 1 Result Factory (for VettingStore tests)
+// Screening Result Factory (for VettingStore tests)
 // ============================================================================
 
-export function makeTier1Result(overrides?: Partial<Tier1Result>): Tier1Result {
+export function makeScreeningResult(overrides?: Partial<ScreeningResult>): ScreeningResult {
   return {
     ein: "95-3135649",
     name: "Test Nonprofit",

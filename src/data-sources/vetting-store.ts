@@ -1,5 +1,5 @@
 import path from "path";
-import { Tier1Result } from "../domain/nonprofit/types.js";
+import { ScreeningResult } from "../domain/nonprofit/types.js";
 import { logInfo, logWarn } from "../core/logging.js";
 import { SqliteDatabase } from "./sqlite-adapter.js";
 
@@ -73,7 +73,7 @@ export class VettingStore {
     logInfo("VettingStore initialized");
   }
 
-  saveResult(result: Tier1Result, vettedBy: string = "kofi"): VettedRecord {
+  saveResult(result: ScreeningResult, vettedBy: string = "kofi"): VettedRecord {
     this.ensureOpen();
 
     const ein = result.ein.replace(/[-\s]/g, "");

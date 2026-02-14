@@ -5,13 +5,13 @@ import {
   CHECK_MESSAGES,
   RED_FLAG_FACTORS,
 } from "../src/domain/nonprofit/messages.js";
-import type { Tier1Check, RedFlag } from "../src/domain/nonprofit/types.js";
+import type { CriterionCheck, RedFlag } from "../src/domain/nonprofit/types.js";
 
 // ============================================================================
 // Helper: build test data
 // ============================================================================
 
-function makeCheck(overrides?: Partial<Tier1Check>): Tier1Check {
+function makeCheck(overrides?: Partial<CriterionCheck>): CriterionCheck {
   return {
     name: "years_operating",
     passed: true,
@@ -100,7 +100,7 @@ describe("RED_FLAG_FACTORS", () => {
 // ============================================================================
 
 describe("generateSummary", () => {
-  const allPassChecks: Tier1Check[] = [
+  const allPassChecks: CriterionCheck[] = [
     makeCheck({ name: "years_operating", result: "PASS" }),
     makeCheck({ name: "revenue_range", result: "PASS" }),
     makeCheck({ name: "spend_rate", result: "PASS" }),
@@ -119,7 +119,7 @@ describe("generateSummary", () => {
         [],
         15,
       );
-      expect(summary.headline).toBe("Approved for Tier 2 Vetting");
+      expect(summary.headline).toBe("Passes Financial Screening");
     });
 
     it("interpolates score, name, and years into justification", () => {
@@ -131,7 +131,7 @@ describe("generateSummary", () => {
         [],
         10,
       );
-      expect(summary.justification).toContain("88/100");
+      // Score removed from PASS template (screening is binary)
       expect(summary.justification).toContain("Acme Foundation");
       expect(summary.justification).toContain("10 years");
     });
@@ -177,7 +177,7 @@ describe("generateSummary", () => {
   // ---------- REVIEW recommendation ----------
 
   describe("REVIEW recommendation", () => {
-    const mixedChecks: Tier1Check[] = [
+    const mixedChecks: CriterionCheck[] = [
       makeCheck({
         name: "years_operating",
         result: "REVIEW",
@@ -267,7 +267,7 @@ describe("generateSummary", () => {
         [],
         0,
       );
-      expect(summary.headline).toBe("Does Not Meet Criteria");
+      expect(summary.headline).toBe("Does Not Meet Screening Criteria");
     });
 
     it("interpolates score into justification", () => {
@@ -384,7 +384,9 @@ describe("generateSummary", () => {
         [],
         20,
       );
-      expect(summary.justification).toContain("100/100");
+      // PASS template no longer includes score (screening is binary)
+      expect(summary.justification).toContain("Org");
+      expect(summary.justification).toContain("20 years");
     });
   });
 });

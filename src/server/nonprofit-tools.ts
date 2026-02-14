@@ -1,5 +1,5 @@
 import * as tools from "../domain/nonprofit/tools.js";
-import { compactTier1, compactRedFlags } from "./response-formatter.js";
+import { compactScreening, compactRedFlags } from "./response-formatter.js";
 import {
   type ToolDefinition,
   argString,
@@ -114,7 +114,7 @@ export function getToolDefinitions(): ToolDefinition[] {
         const verbose = args?.verbose !== false; // default true for backward compat
 
         const { response, cached, cachedNote } =
-          await ctx.vettingPipeline.runTier1(ein, { forceRefresh });
+          await ctx.vettingPipeline.runScreening(ein, { forceRefresh });
 
         // Check error FIRST — before attempting to format data
         if (!response.success || response.error) {
@@ -128,7 +128,7 @@ export function getToolDefinitions(): ToolDefinition[] {
         // Apply compact formatting if not verbose
         const data =
           !verbose && response.data
-            ? compactTier1(response.data)
+            ? compactScreening(response.data)
             : response.data;
 
         const result = cached
@@ -247,7 +247,7 @@ export function getToolDefinitions(): ToolDefinition[] {
 
         for (const ein of eins) {
           try {
-            const { response, cached } = await ctx.vettingPipeline.runTier1(
+            const { response, cached } = await ctx.vettingPipeline.runScreening(
               ein,
               { forceRefresh },
             );
@@ -262,7 +262,7 @@ export function getToolDefinitions(): ToolDefinition[] {
 
               const data = verbose
                 ? response.data
-                : compactTier1(response.data);
+                : compactScreening(response.data);
 
               results.push({ ein, result: data, cached });
             } else {

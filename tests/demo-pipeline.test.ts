@@ -1,5 +1,5 @@
 /**
- * Demo: Full Tier 1 Vetting Pipeline
+ * Demo: Full Screening Pipeline
  *
  * Shows the 3-layer architecture in action:
  *   Layer 1: Gates (binary pre-screen)
@@ -9,7 +9,7 @@
  * Run with: npx vitest run tests/demo-pipeline.test.ts --reporter=verbose
  */
 import { describe, it, expect, vi } from "vitest";
-import { runTier1Checks } from "../src/domain/nonprofit/scoring.js";
+import { runFullScreening } from "../src/domain/nonprofit/scoring.js";
 import {
   makeProfile,
   makeFiling,
@@ -25,7 +25,7 @@ import {
 
 const t = DEFAULT_THRESHOLDS;
 
-describe("Full Tier 1 Pipeline Demo", () => {
+describe("Full Screening Pipeline Demo", () => {
   // -----------------------------------------------------------------
   // Scenario 1: Healthy nonprofit → PASS (score 100)
   // -----------------------------------------------------------------
@@ -38,7 +38,7 @@ describe("Full Tier 1 Pipeline Demo", () => {
     const irs = makeMockIrsClient();
     const ofac = makeMockOfacClient();
 
-    const result = runTier1Checks(
+    const result = runFullScreening(
       profile,
       filings,
       t,
@@ -70,7 +70,7 @@ describe("Full Tier 1 Pipeline Demo", () => {
     expect(result.passed).toBe(true);
 
     // Summary is human-readable
-    expect(result.summary.headline).toBe("Approved for Tier 2 Vetting");
+    expect(result.summary.headline).toBe("Passes Financial Screening");
     expect(result.summary.key_factors.length).toBeGreaterThan(0);
   });
 
@@ -86,7 +86,7 @@ describe("Full Tier 1 Pipeline Demo", () => {
     // IRS says revoked
     irs.check.mockReturnValue(makeRevokedIrsResult());
 
-    const result = runTier1Checks(
+    const result = runFullScreening(
       profile,
       filings,
       t,
@@ -128,7 +128,7 @@ describe("Full Tier 1 Pipeline Demo", () => {
     // OFAC says matched
     ofac.check.mockReturnValue(makeMatchedOfacResult());
 
-    const result = runTier1Checks(
+    const result = runFullScreening(
       profile,
       filings,
       t,
@@ -172,7 +172,7 @@ describe("Full Tier 1 Pipeline Demo", () => {
     const irs = makeMockIrsClient();
     const ofac = makeMockOfacClient();
 
-    const result = runTier1Checks(
+    const result = runFullScreening(
       profile,
       filings,
       t,
@@ -205,7 +205,7 @@ describe("Full Tier 1 Pipeline Demo", () => {
     const ofac = makeMockOfacClient();
     const courtResult = makeFlaggedCourtResult(4); // 3+ = HIGH
 
-    const result = runTier1Checks(
+    const result = runFullScreening(
       profile,
       filings,
       t,
@@ -256,7 +256,7 @@ describe("Full Tier 1 Pipeline Demo", () => {
     const irs = makeMockIrsClient();
     const ofac = makeMockOfacClient();
 
-    const result = runTier1Checks(
+    const result = runFullScreening(
       profile,
       filings,
       t,
