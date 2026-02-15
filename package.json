@@ -1,7 +1,7 @@
 {
   "name": "nonprofit-vetting-mcp",
   "version": "1.0.0",
-  "description": "MCP server for automated grassroots nonprofit vetting using ProPublica Nonprofit Explorer API",
+  "description": "MCP server for automated grassroots nonprofit vetting using IRS BMF and GivingTuesday 990 XML data",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -47,6 +47,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.23.0",
+    "@supabase/supabase-js": "^2.78.0",
     "axios": "^1.13.2",
     "csv-parse": "^6.1.0",
     "dotenv": "^17.2.3",
