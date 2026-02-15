@@ -112,6 +112,18 @@ export class Xml990Store {
     }
   }
 
+  /** Get all extracts for an EIN, ordered by tax year descending. */
+  getAllExtracts(ein: string): Xml990ExtractedData[] {
+    this.ensureOpen();
+
+    const normalized = ein.replace(/[-\s]/g, "");
+    const rows = this.db!.prepare(
+      "SELECT extract_json FROM xml_990_extracts WHERE ein = ? ORDER BY tax_year DESC, id DESC",
+    ).all(normalized) as { extract_json: string }[];
+
+    return rows.map((row) => JSON.parse(row.extract_json) as Xml990ExtractedData);
+  }
+
   hasExtract(ein: string, objectId: string): boolean {
     this.ensureOpen();
 

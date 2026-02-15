@@ -5,7 +5,7 @@ import {
   CheckResult,
   RedFlag,
   RedFlagResult,
-  ProPublica990Filing,
+  Filing990Summary,
   VettingThresholds,
   CourtRecordsResult,
   PortfolioFitConfig,
@@ -112,7 +112,7 @@ export function checkRevenueRange(
 /**
  * Check 4: Expense Efficiency (renamed from "overhead ratio")
  *
- * NOTE: ProPublica data doesn't separate program vs admin expenses,
+ * NOTE: 990 summary data doesn't separate program vs admin expenses,
  * so we cannot calculate true overhead (admin/fundraising %).
  *
  * Instead, we check Expense-to-Revenue ratio using configurable bands.
@@ -269,7 +269,7 @@ export function getRecommendation(
  */
 export function detectRedFlags(
   profile: NonprofitProfile,
-  filings: ProPublica990Filing[] | undefined,
+  filings: Filing990Summary[] | undefined,
   t: VettingThresholds,
   courtResult?: CourtRecordsResult,
   ofacClient?: OfacSdnClient,
@@ -470,7 +470,7 @@ export function runScoringChecks(
  */
 export function runFullScreening(
   profile: NonprofitProfile,
-  filings: ProPublica990Filing[] | undefined,
+  filings: Filing990Summary[] | undefined,
   t: VettingThresholds,
   irsClient: IrsRevocationClient,
   ofacClient: OfacSdnClient,
@@ -553,7 +553,7 @@ export function runFullScreening(
  */
 export function runRedFlagCheck(
   profile: NonprofitProfile,
-  filings: ProPublica990Filing[] | undefined,
+  filings: Filing990Summary[] | undefined,
   t: VettingThresholds,
   courtResult?: CourtRecordsResult,
   ofacClient?: OfacSdnClient,

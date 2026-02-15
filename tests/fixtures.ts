@@ -3,7 +3,7 @@ import type {
   NonprofitProfile,
   VettingThresholds,
   PortfolioFitConfig,
-  ProPublica990Filing,
+  Filing990Summary,
   Latest990Summary,
   IrsRevocationRow,
   IrsRevocationResult,
@@ -54,7 +54,7 @@ function recentTaxPeriod(): string {
   return `${now.getFullYear() - 1}-06`;
 }
 
-/** A recent tax period number (YYYYMM) for raw ProPublica filings */
+/** A recent tax period number (YYYYMM) for raw 990 filing adapters */
 function recentTaxPrd(): number {
   const now = new Date();
   return (now.getFullYear() - 1) * 100 + 6; // e.g., 202506
@@ -105,8 +105,8 @@ export function makeProfile(
  * Build a raw ProPublica 990 filing record.
  */
 export function makeFiling(
-  overrides?: Partial<ProPublica990Filing>,
-): ProPublica990Filing {
+  overrides?: Partial<Filing990Summary>,
+): Filing990Summary {
   return {
     tax_prd: recentTaxPrd(),
     tax_prd_yr: new Date().getFullYear() - 1,

@@ -236,7 +236,7 @@ describe("screen_nonprofit handler error ordering", () => {
       response: {
         success: false,
         error: "Organization not found",
-        attribution: "ProPublica Nonprofit Explorer API",
+        attribution: "IRS BMF + GivingTuesday Data Commons (ODbL 1.0)",
       },
       cached: false,
       cachedNote: undefined,

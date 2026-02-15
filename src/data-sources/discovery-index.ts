@@ -312,6 +312,18 @@ export class DiscoveryIndex {
     };
   }
 
+  /** Look up a single org by EIN. Returns null if not found. */
+  getByEin(ein: string): DiscoveryCandidate | null {
+    this.ensureOpen();
+
+    const normalized = ein.replace(/[-\s]/g, "");
+    const row = this.db!.prepare(
+      "SELECT ein, name, city, state, ntee_code, subsection, ruling_date FROM bmf_orgs WHERE ein = ?",
+    ).get(normalized) as unknown as DiscoveryCandidate | undefined;
+
+    return row ?? null;
+  }
+
   /** Get index statistics. */
   getStats(): { totalOrgs: number; lastUpdated: string | null } {
     this.ensureOpen();
