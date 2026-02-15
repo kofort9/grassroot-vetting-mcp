@@ -1,4 +1,5 @@
-import { loadConfig, type AppConfig } from "../core/config.js";
+import path from "path";
+import { loadConfig, loadGivingTuesdayConfig, type AppConfig } from "../core/config.js";
 import { ProPublicaClient } from "../domain/nonprofit/propublica-client.js";
 import { CsvDataStore } from "../data-sources/csv-data-store.js";
 import { VettingStore } from "../data-sources/vetting-store.js";
@@ -9,6 +10,9 @@ import { DiscoveryIndex } from "../data-sources/discovery-index.js";
 import { DiscoveryPipeline } from "../domain/discovery/pipeline.js";
 import { VettingPipeline } from "../domain/nonprofit/vetting-pipeline.js";
 import { SearchHistoryStore } from "../data-sources/search-history-store.js";
+import { GivingTuesdayClient } from "../data-sources/givingtuesday-client.js";
+import { Xml990Store } from "../data-sources/xml-990-store.js";
+import { ConcordanceIndex } from "../data-sources/concordance.js";
 import { ensureSqlJs } from "../data-sources/sqlite-adapter.js";
 import { logInfo, logError } from "../core/logging.js";
 
@@ -25,6 +29,9 @@ export interface ServerContext {
   searchHistoryStore: SearchHistoryStore | undefined;
   discoveryPipeline: DiscoveryPipeline;
   discoveryReady: boolean;
+  givingTuesdayClient: GivingTuesdayClient;
+  xml990Store: Xml990Store;
+  concordance: ConcordanceIndex;
 }
 
 /**
@@ -112,8 +119,38 @@ export async function createServerContext(): Promise<ServerContext> {
     }
   }
 
+  // Initialize local data pipeline for screening
+  const gtConfig = loadGivingTuesdayConfig();
+  const givingTuesdayClient = new GivingTuesdayClient(gtConfig);
+
+  const dataDir = config.redFlag.dataDir;
+  const xml990Store = new Xml990Store(dataDir);
+  try {
+    xml990Store.initialize();
+  } catch (err) {
+    logError(
+      "Xml990Store initialization failed:",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+
+  const concordance = new ConcordanceIndex(
+    path.join(dataDir, "concordance/concordance.csv"),
+  );
+  try {
+    await concordance.initialize();
+  } catch (err) {
+    logError(
+      "ConcordanceIndex initialization failed:",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+
   const vettingPipeline = new VettingPipeline({
-    propublicaClient,
+    discoveryIndex,
+    givingTuesdayClient,
+    xml990Store,
+    concordance,
     thresholds: config.thresholds,
     portfolioFit: config.portfolioFit,
     irsClient,
@@ -136,5 +173,8 @@ export async function createServerContext(): Promise<ServerContext> {
     discoveryIndex,
     discoveryPipeline,
     discoveryReady,
+    givingTuesdayClient,
+    xml990Store,
+    concordance,
   };
 }

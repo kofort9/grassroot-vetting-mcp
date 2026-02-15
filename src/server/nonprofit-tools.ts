@@ -1,4 +1,9 @@
 import * as tools from "../domain/nonprofit/tools.js";
+import {
+  getNonprofitProfileLocal,
+  getRedFlagsLocal,
+  type LocalScreeningDeps,
+} from "../domain/nonprofit/tools-local.js";
 import { compactScreening, compactRedFlags } from "./response-formatter.js";
 import {
   type ToolDefinition,
@@ -8,6 +13,21 @@ import {
   argStringArray,
   formatToolResponse,
 } from "./tool-registry.js";
+import type { ServerContext } from "./context.js";
+
+function buildLocalDeps(ctx: ServerContext): LocalScreeningDeps {
+  return {
+    discoveryIndex: ctx.discoveryIndex,
+    givingTuesdayClient: ctx.givingTuesdayClient,
+    xml990Store: ctx.xml990Store,
+    concordance: ctx.concordance,
+    thresholds: ctx.config.thresholds,
+    irsClient: ctx.irsClient,
+    ofacClient: ctx.ofacClient,
+    portfolioFitConfig: ctx.config.portfolioFit,
+    courtClient: ctx.courtClient,
+  };
+}
 
 export function getToolDefinitions(): ToolDefinition[] {
   return [
@@ -64,7 +84,7 @@ export function getToolDefinitions(): ToolDefinition[] {
     {
       name: "get_nonprofit_profile",
       description:
-        "Get detailed profile for a nonprofit by EIN. Returns organization info, 501(c)(3) status, years operating, and latest 990 financial summary including overhead ratio. Data from ProPublica Nonprofit Explorer.",
+        "Get detailed profile for a nonprofit by EIN. Returns organization info, 501(c)(3) status, years operating, and latest 990 financial summary including overhead ratio. Data from IRS BMF + GivingTuesday Data Commons.",
       inputSchema: {
         type: "object",
         properties: {
@@ -78,9 +98,10 @@ export function getToolDefinitions(): ToolDefinition[] {
       },
       handler: async (args, ctx) =>
         formatToolResponse(
-          await tools.getNonprofitProfile(ctx.propublicaClient, {
-            ein: argString(args, "ein"),
-          }),
+          await getNonprofitProfileLocal(
+            argString(args, "ein"),
+            buildLocalDeps(ctx),
+          ),
         ),
     },
     {
@@ -151,7 +172,7 @@ export function getToolDefinitions(): ToolDefinition[] {
     {
       name: "get_red_flags",
       description:
-        "Get red flags and warnings for a nonprofit. Checks for: stale data, high overhead, very low revenue, revenue decline, high officer compensation, and court records. Returns list of flags with severity (HIGH/MEDIUM) and details.",
+        "Get red flags and warnings for a nonprofit. Checks for: stale data, high overhead, very low revenue, revenue decline, high officer compensation, and court records. Returns list of flags with severity (HIGH/MEDIUM) and details. Data from IRS BMF + GivingTuesday Data Commons.",
       inputSchema: {
         type: "object",
         properties: {
@@ -170,12 +191,9 @@ export function getToolDefinitions(): ToolDefinition[] {
       },
       handler: async (args, ctx) => {
         const verbose = args?.verbose !== false;
-        const response = await tools.getRedFlags(
-          ctx.propublicaClient,
-          { ein: argString(args, "ein") },
-          ctx.config.thresholds,
-          ctx.courtClient,
-          ctx.ofacClient,
+        const response = await getRedFlagsLocal(
+          argString(args, "ein"),
+          buildLocalDeps(ctx),
         );
 
         if (!verbose && response.data) {
@@ -223,7 +241,7 @@ export function getToolDefinitions(): ToolDefinition[] {
           return formatToolResponse({
             success: false,
             error: "eins array is required and must not be empty.",
-            attribution: "ProPublica Nonprofit Explorer API",
+            attribution: "IRS BMF + GivingTuesday Data Commons (ODbL 1.0)",
           });
         }
 
@@ -231,7 +249,7 @@ export function getToolDefinitions(): ToolDefinition[] {
           return formatToolResponse({
             success: false,
             error: `Too many EINs. Max ${MAX_BATCH} per batch, got ${eins.length}.`,
-            attribution: "ProPublica Nonprofit Explorer API",
+            attribution: "IRS BMF + GivingTuesday Data Commons (ODbL 1.0)",
           });
         }
 
@@ -288,7 +306,7 @@ export function getToolDefinitions(): ToolDefinition[] {
         return formatToolResponse({
           success: true,
           data: { results, stats, total: eins.length },
-          attribution: "ProPublica Nonprofit Explorer API",
+          attribution: "IRS BMF + GivingTuesday Data Commons (ODbL 1.0)",
         });
       },
     },
