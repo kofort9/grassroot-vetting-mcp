@@ -1,13 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "=== Pre-commit: build ==="
-npm run build
-
 echo "=== Pre-commit: lint ==="
 npx eslint src/
 
-echo "=== Pre-commit: test ==="
-npm test
-
-echo "=== All checks passed ==="
+echo "=== Lint passed ==="

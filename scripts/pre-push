@@ -1,0 +1,10 @@
+#!/bin/bash
+set -e
+
+echo "=== Pre-push: build ==="
+npm run build
+
+echo "=== Pre-push: test ==="
+npm test
+
+echo "=== All checks passed ==="
