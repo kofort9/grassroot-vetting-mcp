@@ -1,4 +1,4 @@
-# Data Source Licensing — Can We Charge Users?
+# Data Source Licensing
 
 **Last updated:** 2026-02-14
 **Status:** ProPublica fully removed (BON-88), outreach needed for CourtListener
