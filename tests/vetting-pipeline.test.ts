@@ -3,9 +3,9 @@ import { VettingPipeline } from "../src/domain/nonprofit/vetting-pipeline.js";
 import { makeScreeningResult } from "./fixtures.js";
 import type { VettingPipelineConfig } from "../src/domain/nonprofit/vetting-pipeline.js";
 
-// Mock the tools module
+// Mock the local screening module (replaces the old tools.js mock)
 vi.mock("../src/domain/nonprofit/tools.js", () => ({
-  screenNonprofit: vi.fn(),
+  screenNonprofitLocal: vi.fn(),
 }));
 
 // Mock logging to suppress output
@@ -16,9 +16,9 @@ vi.mock("../src/core/logging.js", () => ({
   logError: vi.fn(),
 }));
 
-import { screenNonprofit } from "../src/domain/nonprofit/tools.js";
+import { screenNonprofitLocal } from "../src/domain/nonprofit/tools.js";
 
-const mockedScreenNonprofit = vi.mocked(screenNonprofit);
+const mockedScreenNonprofitLocal = vi.mocked(screenNonprofitLocal);
 
 /** Returns an ISO datetime string N days in the past */
 function daysAgo(n: number): string {
@@ -30,7 +30,10 @@ function makeMockConfig(
   overrides?: Partial<VettingPipelineConfig>,
 ): VettingPipelineConfig {
   return {
-    propublicaClient: {} as VettingPipelineConfig["propublicaClient"],
+    discoveryIndex: {} as VettingPipelineConfig["discoveryIndex"],
+    givingTuesdayClient: {} as VettingPipelineConfig["givingTuesdayClient"],
+    xml990Store: {} as VettingPipelineConfig["xml990Store"],
+    concordance: {} as VettingPipelineConfig["concordance"],
     thresholds: {} as VettingPipelineConfig["thresholds"],
     portfolioFit: {} as VettingPipelineConfig["portfolioFit"],
     irsClient: {} as VettingPipelineConfig["irsClient"],
@@ -45,6 +48,8 @@ function makeMockConfig(
   };
 }
 
+const ATTRIBUTION = "Data provided by IRS BMF + GivingTuesday Data Commons (ODbL 1.0)";
+
 describe("VettingPipeline", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -52,10 +57,10 @@ describe("VettingPipeline", () => {
 
   it("returns fresh result on cache miss", async () => {
     const tier1Result = makeScreeningResult({ ein: "12-3456789" });
-    mockedScreenNonprofit.mockResolvedValue({
+    mockedScreenNonprofitLocal.mockResolvedValue({
       success: true,
       data: tier1Result,
-      attribution: "ProPublica Nonprofit Explorer API",
+      attribution: ATTRIBUTION,
     });
 
     const config = makeMockConfig();
@@ -65,7 +70,7 @@ describe("VettingPipeline", () => {
     expect(cached).toBe(false);
     expect(response.success).toBe(true);
     expect(response.data?.ein).toBe("12-3456789");
-    expect(mockedScreenNonprofit).toHaveBeenCalledOnce();
+    expect(mockedScreenNonprofitLocal).toHaveBeenCalledOnce();
   });
 
   it("returns cached result on cache hit (within TTL)", async () => {
@@ -90,15 +95,15 @@ describe("VettingPipeline", () => {
     expect(response.success).toBe(true);
     expect(cachedNote).toContain("Previously vetted on");
     expect(cachedNote).toContain("TTL 30d");
-    expect(mockedScreenNonprofit).not.toHaveBeenCalled();
+    expect(mockedScreenNonprofitLocal).not.toHaveBeenCalled();
   });
 
   it("auto-refreshes when cached result exceeds TTL", async () => {
     const tier1Result = makeScreeningResult({ ein: "12-3456789" });
-    mockedScreenNonprofit.mockResolvedValue({
+    mockedScreenNonprofitLocal.mockResolvedValue({
       success: true,
       data: tier1Result,
-      attribution: "ProPublica Nonprofit Explorer API",
+      attribution: ATTRIBUTION,
     });
 
     const staleDate = daysAgo(45); // 45 days old, exceeds 30-day TTL
@@ -117,15 +122,15 @@ describe("VettingPipeline", () => {
     const { cached } = await pipeline.runScreening("12-3456789");
 
     expect(cached).toBe(false);
-    expect(mockedScreenNonprofit).toHaveBeenCalledOnce();
+    expect(mockedScreenNonprofitLocal).toHaveBeenCalledOnce();
   });
 
   it("respects custom cacheMaxAgeDays", async () => {
     const tier1Result = makeScreeningResult({ ein: "12-3456789" });
-    mockedScreenNonprofit.mockResolvedValue({
+    mockedScreenNonprofitLocal.mockResolvedValue({
       success: true,
       data: tier1Result,
-      attribution: "ProPublica Nonprofit Explorer API",
+      attribution: ATTRIBUTION,
     });
 
     const date10dAgo = daysAgo(10);
@@ -146,15 +151,15 @@ describe("VettingPipeline", () => {
 
     // 10 days old > 7-day TTL → should re-vet
     expect(cached).toBe(false);
-    expect(mockedScreenNonprofit).toHaveBeenCalledOnce();
+    expect(mockedScreenNonprofitLocal).toHaveBeenCalledOnce();
   });
 
   it("bypasses cache when forceRefresh is true", async () => {
     const tier1Result = makeScreeningResult({ ein: "12-3456789" });
-    mockedScreenNonprofit.mockResolvedValue({
+    mockedScreenNonprofitLocal.mockResolvedValue({
       success: true,
       data: tier1Result,
-      attribution: "ProPublica Nonprofit Explorer API",
+      attribution: ATTRIBUTION,
     });
 
     const config = makeMockConfig({
@@ -174,15 +179,15 @@ describe("VettingPipeline", () => {
     });
 
     expect(cached).toBe(false);
-    expect(mockedScreenNonprofit).toHaveBeenCalledOnce();
+    expect(mockedScreenNonprofitLocal).toHaveBeenCalledOnce();
   });
 
   it("persists result on success", async () => {
     const tier1Result = makeScreeningResult();
-    mockedScreenNonprofit.mockResolvedValue({
+    mockedScreenNonprofitLocal.mockResolvedValue({
       success: true,
       data: tier1Result,
-      attribution: "ProPublica Nonprofit Explorer API",
+      attribution: ATTRIBUTION,
     });
 
     const saveResult = vi.fn();
@@ -201,10 +206,10 @@ describe("VettingPipeline", () => {
 
   it("does not throw when persistence fails", async () => {
     const tier1Result = makeScreeningResult();
-    mockedScreenNonprofit.mockResolvedValue({
+    mockedScreenNonprofitLocal.mockResolvedValue({
       success: true,
       data: tier1Result,
-      attribution: "ProPublica Nonprofit Explorer API",
+      attribution: ATTRIBUTION,
     });
 
     const config = makeMockConfig({
@@ -225,10 +230,10 @@ describe("VettingPipeline", () => {
 
   it("skips cache check when vettingStore is undefined", async () => {
     const tier1Result = makeScreeningResult();
-    mockedScreenNonprofit.mockResolvedValue({
+    mockedScreenNonprofitLocal.mockResolvedValue({
       success: true,
       data: tier1Result,
-      attribution: "ProPublica Nonprofit Explorer API",
+      attribution: ATTRIBUTION,
     });
 
     const config = makeMockConfig({
@@ -238,6 +243,6 @@ describe("VettingPipeline", () => {
     const pipeline = new VettingPipeline(config);
     await pipeline.runScreening("12-3456789");
 
-    expect(mockedScreenNonprofit).toHaveBeenCalledOnce();
+    expect(mockedScreenNonprofitLocal).toHaveBeenCalledOnce();
   });
 });

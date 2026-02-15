@@ -3,7 +3,8 @@ import {
   getNonprofitProfileLocal,
   getRedFlagsLocal,
   type LocalScreeningDeps,
-} from "../src/domain/nonprofit/tools-local.js";
+} from "../src/domain/nonprofit/tools.js";
+import { getToolDefinitions } from "../src/server/nonprofit-tools.js";
 import {
   makeGtFilingEntry,
   makeXml990ExtractedData,
@@ -11,6 +12,7 @@ import {
   makePortfolioFitConfig,
 } from "./fixtures.js";
 import type { DiscoveryCandidate } from "../src/domain/discovery/types.js";
+import type { DiscoveryResult } from "../src/domain/discovery/types.js";
 
 // ============================================================================
 // Shared mock factories
@@ -229,5 +231,99 @@ describe("getRedFlagsLocal", () => {
     // Should succeed despite court failure
     expect(result.success).toBe(true);
     expect(result.data).toBeDefined();
+  });
+});
+
+// ============================================================================
+// search_nonprofit (BMF-backed)
+// ============================================================================
+
+describe("search_nonprofit handler", () => {
+  function getSearchHandler() {
+    const tools = getToolDefinitions();
+    const searchTool = tools.find((t) => t.name === "search_nonprofit");
+    if (!searchTool) throw new Error("search_nonprofit tool not found");
+    return searchTool.handler;
+  }
+
+  function makeSearchCtx(
+    candidates: DiscoveryCandidate[] = [],
+    ready = true,
+  ): any {
+    return {
+      discoveryIndex: {
+        isReady: vi.fn().mockReturnValue(ready),
+        query: vi.fn().mockReturnValue({
+          candidates,
+          total: candidates.length,
+          filters_applied: [],
+          index_stats: { total_orgs: 1000, last_updated: "2026-01-01" },
+        } as DiscoveryResult),
+      },
+      searchHistoryStore: {
+        logSearch: vi.fn(),
+      },
+    };
+  }
+
+  it("returns matching orgs from BMF", async () => {
+    const handler = getSearchHandler();
+    const ctx = makeSearchCtx([
+      makeCandidate({ name: "Habitat for Humanity International" }),
+      makeCandidate({ ein: "541234567", name: "Habitat for Humanity of Portland" }),
+    ]);
+
+    const result = await handler({ query: "habitat for humanity" }, ctx);
+
+    expect(result).toBeDefined();
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.success).toBe(true);
+    expect(parsed.data.results).toHaveLength(2);
+    expect(parsed.data.results[0].name).toBe("Habitat for Humanity International");
+    expect(parsed.data.attribution).toContain("IRS Business Master File");
+  });
+
+  it("passes state filter to discovery index", async () => {
+    const handler = getSearchHandler();
+    const ctx = makeSearchCtx([makeCandidate({ state: "CA" })]);
+
+    await handler({ query: "habitat", state: "CA" }, ctx);
+
+    expect(ctx.discoveryIndex.query).toHaveBeenCalledWith(
+      expect.objectContaining({ state: "CA", nameContains: "habitat" }),
+    );
+  });
+
+  it("passes city filter to discovery index", async () => {
+    const handler = getSearchHandler();
+    const ctx = makeSearchCtx([makeCandidate({ city: "Portland" })]);
+
+    await handler({ query: "habitat", city: "Portland" }, ctx);
+
+    expect(ctx.discoveryIndex.query).toHaveBeenCalledWith(
+      expect.objectContaining({ city: "Portland" }),
+    );
+  });
+
+  it("returns error when query is empty", async () => {
+    const handler = getSearchHandler();
+    const ctx = makeSearchCtx();
+
+    const result = await handler({ query: "" }, ctx);
+
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toContain("Query parameter is required");
+  });
+
+  it("returns error when BMF index not ready", async () => {
+    const handler = getSearchHandler();
+    const ctx = makeSearchCtx([], false);
+
+    const result = await handler({ query: "test" }, ctx);
+
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toContain("not initialized");
   });
 });

@@ -10,9 +10,9 @@ import type { GateCheckResult } from "./gate-types.js";
  * Individual-type matches on an org name are likely false positives
  * (e.g., org "John Smith Foundation" matching individual "John Smith").
  *
- * NOTE: Officer-level OFAC checks are deferred — ProPublica API summary
- * doesn't expose officer names. When added, the entity-type filter must
- * be revisited.
+ * NOTE: Officer-level OFAC checks are deferred — XML 990 Part VII provides
+ * officer names but matching logic is not yet implemented. When added, the
+ * entity-type filter must be revisited.
  */
 export function checkOfacSanctions(
   orgName: string,

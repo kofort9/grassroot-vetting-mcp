@@ -1,9 +1,8 @@
-import * as tools from "../domain/nonprofit/tools.js";
 import {
   getNonprofitProfileLocal,
   getRedFlagsLocal,
   type LocalScreeningDeps,
-} from "../domain/nonprofit/tools-local.js";
+} from "../domain/nonprofit/tools.js";
 import { compactScreening, compactRedFlags } from "./response-formatter.js";
 import {
   type ToolDefinition,
@@ -14,6 +13,8 @@ import {
   formatToolResponse,
 } from "./tool-registry.js";
 import type { ServerContext } from "./context.js";
+import type { NonprofitSearchResult } from "../domain/nonprofit/types/profile.js";
+import { formatEin } from "../domain/nonprofit/date-utils.js";
 
 function buildLocalDeps(ctx: ServerContext): LocalScreeningDeps {
   return {
@@ -34,7 +35,7 @@ export function getToolDefinitions(): ToolDefinition[] {
     {
       name: "search_nonprofit",
       description:
-        "Search for nonprofits by name. Returns matching organizations with EIN, name, city, state, and NTEE code. Data from ProPublica Nonprofit Explorer.",
+        "Search for nonprofits by name. Returns matching organizations with EIN, name, city, state, and NTEE code. Data from IRS Business Master File.",
       inputSchema: {
         type: "object",
         properties: {
@@ -55,30 +56,69 @@ export function getToolDefinitions(): ToolDefinition[] {
         required: ["query"],
       },
       handler: async (args, ctx) => {
-        const queryArgs = {
-          query: argString(args, "query"),
-          state: argStringOpt(args, "state"),
-          city: argStringOpt(args, "city"),
-        };
-        const result = await tools.searchNonprofit(
-          ctx.propublicaClient,
-          queryArgs,
-        );
+        const ATTRIBUTION = "Data provided by IRS Business Master File";
+        const query = argString(args, "query");
+        const state = argStringOpt(args, "state");
+        const city = argStringOpt(args, "city");
+
+        if (!query || query.trim().length === 0) {
+          return formatToolResponse({
+            success: false,
+            error: "Query parameter is required",
+            attribution: ATTRIBUTION,
+          });
+        }
+
+        if (!ctx.discoveryIndex.isReady()) {
+          return formatToolResponse({
+            success: false,
+            error:
+              "BMF discovery index is not initialized. Run refresh_discovery_index first.",
+            attribution: ATTRIBUTION,
+          });
+        }
+
+        const discoveryResult = ctx.discoveryIndex.query({
+          nameContains: query,
+          state: state ?? undefined,
+          city: city ?? undefined,
+          portfolioFitOnly: false,
+          limit: 100,
+        });
+
+        const results: NonprofitSearchResult[] =
+          discoveryResult.candidates.map((c) => ({
+            ein: formatEin(c.ein),
+            name: c.name,
+            city: c.city || "",
+            state: c.state || "",
+            ntee_code: c.ntee_code || "",
+          }));
+
+        const queryArgs = { query, state, city };
 
         // Log search (non-blocking)
-        if (result.success && result.data && ctx.searchHistoryStore) {
+        if (ctx.searchHistoryStore) {
           try {
             ctx.searchHistoryStore.logSearch(
               "search_nonprofit",
               queryArgs,
-              result.data.total,
+              discoveryResult.total,
             );
           } catch {
             // Silently ignore — logging is best-effort
           }
         }
 
-        return formatToolResponse(result);
+        return formatToolResponse({
+          success: true,
+          data: {
+            results,
+            total: discoveryResult.total,
+            attribution: ATTRIBUTION,
+          },
+          attribution: ATTRIBUTION,
+        });
       },
     },
     {

@@ -2,11 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { VettingPipeline } from "../src/domain/nonprofit/vetting-pipeline.js";
 import { makeScreeningResult } from "./fixtures.js";
 import type { VettingPipelineConfig } from "../src/domain/nonprofit/vetting-pipeline.js";
-import type { ScreeningResult, ToolResponse } from "../src/domain/nonprofit/types.js";
 
-// Mock the tools module
+// Mock the local screening module
 vi.mock("../src/domain/nonprofit/tools.js", () => ({
-  screenNonprofit: vi.fn(),
+  screenNonprofitLocal: vi.fn(),
 }));
 
 vi.mock("../src/core/logging.js", () => ({
@@ -16,9 +15,9 @@ vi.mock("../src/core/logging.js", () => ({
   logError: vi.fn(),
 }));
 
-import { screenNonprofit } from "../src/domain/nonprofit/tools.js";
+import { screenNonprofitLocal } from "../src/domain/nonprofit/tools.js";
 
-const mockedScreenNonprofit = vi.mocked(screenNonprofit);
+const mockedScreenNonprofitLocal = vi.mocked(screenNonprofitLocal);
 
 /** Returns an ISO datetime string N days in the past */
 function daysAgo(n: number): string {
@@ -26,9 +25,14 @@ function daysAgo(n: number): string {
   return d.toISOString().replace("T", " ").slice(0, 19);
 }
 
+const ATTRIBUTION = "Data provided by IRS BMF + GivingTuesday Data Commons (ODbL 1.0)";
+
 function makeMockConfig(): VettingPipelineConfig {
   return {
-    propublicaClient: {} as VettingPipelineConfig["propublicaClient"],
+    discoveryIndex: {} as VettingPipelineConfig["discoveryIndex"],
+    givingTuesdayClient: {} as VettingPipelineConfig["givingTuesdayClient"],
+    xml990Store: {} as VettingPipelineConfig["xml990Store"],
+    concordance: {} as VettingPipelineConfig["concordance"],
     thresholds: {} as VettingPipelineConfig["thresholds"],
     portfolioFit: {} as VettingPipelineConfig["portfolioFit"],
     irsClient: {} as VettingPipelineConfig["irsClient"],
@@ -50,14 +54,14 @@ describe("batch_screening via VettingPipeline", () => {
   it("processes multiple EINs sequentially", async () => {
     const eins = ["12-3456789", "98-7654321", "55-5555555"];
 
-    mockedScreenNonprofit.mockImplementation(async (_client, input) => ({
+    mockedScreenNonprofitLocal.mockImplementation(async (ein) => ({
       success: true,
       data: makeScreeningResult({
-        ein: input.ein,
-        recommendation: input.ein === "55-5555555" ? "REVIEW" : "PASS",
-        score: input.ein === "55-5555555" ? 60 : 85,
+        ein,
+        recommendation: ein === "55-5555555" ? "REVIEW" : "PASS",
+        score: ein === "55-5555555" ? 60 : 85,
       }),
-      attribution: "ProPublica Nonprofit Explorer API",
+      attribution: ATTRIBUTION,
     }));
 
     const pipeline = new VettingPipeline(makeMockConfig());
@@ -81,14 +85,14 @@ describe("batch_screening via VettingPipeline", () => {
     expect(stats.pass).toBe(2);
     expect(stats.review).toBe(1);
     expect(stats.reject).toBe(0);
-    expect(mockedScreenNonprofit).toHaveBeenCalledTimes(3);
+    expect(mockedScreenNonprofitLocal).toHaveBeenCalledTimes(3);
   });
 
   it("counts cached results in stats", async () => {
     const cachedResult = makeScreeningResult({ ein: "12-3456789" });
 
     const config = makeMockConfig();
-    (config.vettingStore.getLatestByEin as ReturnType<typeof vi.fn>)
+    (config.vettingStore!.getLatestByEin as ReturnType<typeof vi.fn>)
       .mockReturnValueOnce({
         result_json: JSON.stringify(cachedResult),
         vetted_at: daysAgo(3),
@@ -96,10 +100,10 @@ describe("batch_screening via VettingPipeline", () => {
       })
       .mockReturnValueOnce(null);
 
-    mockedScreenNonprofit.mockResolvedValue({
+    mockedScreenNonprofitLocal.mockResolvedValue({
       success: true,
       data: makeScreeningResult({ ein: "98-7654321" }),
-      attribution: "test",
+      attribution: ATTRIBUTION,
     });
 
     const pipeline = new VettingPipeline(config);
@@ -109,20 +113,20 @@ describe("batch_screening via VettingPipeline", () => {
 
     expect(r1.cached).toBe(true);
     expect(r2.cached).toBe(false);
-    expect(mockedScreenNonprofit).toHaveBeenCalledTimes(1); // only 1 uncached
+    expect(mockedScreenNonprofitLocal).toHaveBeenCalledTimes(1); // only 1 uncached
   });
 
   it("handles errors gracefully for individual EINs", async () => {
-    mockedScreenNonprofit
+    mockedScreenNonprofitLocal
       .mockResolvedValueOnce({
         success: true,
         data: makeScreeningResult({ ein: "12-3456789" }),
-        attribution: "test",
+        attribution: ATTRIBUTION,
       })
       .mockResolvedValueOnce({
         success: false,
         error: "Organization not found",
-        attribution: "test",
+        attribution: ATTRIBUTION,
       });
 
     const pipeline = new VettingPipeline(makeMockConfig());

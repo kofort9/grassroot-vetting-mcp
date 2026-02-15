@@ -1,6 +1,5 @@
 import path from "path";
 import { loadConfig, loadGivingTuesdayConfig, type AppConfig } from "../core/config.js";
-import { ProPublicaClient } from "../domain/nonprofit/propublica-client.js";
 import { CsvDataStore } from "../data-sources/csv-data-store.js";
 import { VettingStore } from "../data-sources/vetting-store.js";
 import { IrsRevocationClient } from "../domain/red-flags/irs-revocation-client.js";
@@ -18,7 +17,6 @@ import { logInfo, logError } from "../core/logging.js";
 
 export interface ServerContext {
   config: AppConfig;
-  propublicaClient: ProPublicaClient;
   dataStore: CsvDataStore;
   irsClient: IrsRevocationClient;
   ofacClient: OfacSdnClient;
@@ -43,7 +41,6 @@ export async function createServerContext(): Promise<ServerContext> {
   await ensureSqlJs();
 
   const config = loadConfig();
-  const propublicaClient = new ProPublicaClient(config.propublica);
   const { thresholds: _, portfolioFit } = config;
 
   const dataStore = new CsvDataStore(config.redFlag);
@@ -162,7 +159,6 @@ export async function createServerContext(): Promise<ServerContext> {
 
   return {
     config,
-    propublicaClient,
     dataStore,
     irsClient,
     ofacClient,

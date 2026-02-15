@@ -1,4 +1,3 @@
-import type { ProPublicaClient } from "./propublica-client.js";
 import type {
   VettingThresholds,
   PortfolioFitConfig,
@@ -9,11 +8,21 @@ import type { VettingStore } from "../../data-sources/vetting-store.js";
 import type { IrsRevocationClient } from "../red-flags/irs-revocation-client.js";
 import type { OfacSdnClient } from "../red-flags/ofac-sdn-client.js";
 import type { CourtListenerClient } from "../red-flags/courtlistener-client.js";
-import { screenNonprofit } from "./tools.js";
+import type { DiscoveryIndex } from "../../data-sources/discovery-index.js";
+import type { Xml990Store } from "../../data-sources/xml-990-store.js";
+import type { GivingTuesdayClient } from "../../data-sources/givingtuesday-client.js";
+import type { ConcordanceIndex } from "../../data-sources/concordance.js";
+import { screenNonprofitLocal } from "./tools.js";
 import { logError } from "../../core/logging.js";
 
+const ATTRIBUTION =
+  "Data provided by IRS BMF + GivingTuesday Data Commons (ODbL 1.0)";
+
 export interface VettingPipelineConfig {
-  propublicaClient: ProPublicaClient;
+  discoveryIndex: DiscoveryIndex;
+  givingTuesdayClient: GivingTuesdayClient;
+  xml990Store: Xml990Store;
+  concordance: ConcordanceIndex;
   thresholds: VettingThresholds;
   portfolioFit: PortfolioFitConfig;
   irsClient: IrsRevocationClient;
@@ -68,7 +77,7 @@ export class VettingPipeline {
               response: {
                 success: true,
                 data: cachedResult,
-                attribution: "ProPublica Nonprofit Explorer API",
+                attribution: ATTRIBUTION,
               },
               cached: true,
               cachedNote: `Previously vetted on ${cached.vetted_at} by ${cached.vetted_by} (${Math.floor(ageDays)}d ago, TTL ${maxAge}d). Use force_refresh: true to re-vet.`,
@@ -79,25 +88,18 @@ export class VettingPipeline {
       }
     }
 
-    // 2. Run vetting
-    const {
-      propublicaClient,
-      thresholds,
-      irsClient,
-      ofacClient,
-      portfolioFit,
-      courtClient,
-    } = this.config;
-
-    const response = await screenNonprofit(
-      propublicaClient,
-      { ein },
-      thresholds,
-      irsClient,
-      ofacClient,
-      portfolioFit,
-      courtClient,
-    );
+    // 2. Run vetting via local data sources
+    const response = await screenNonprofitLocal(ein, {
+      discoveryIndex: this.config.discoveryIndex,
+      givingTuesdayClient: this.config.givingTuesdayClient,
+      xml990Store: this.config.xml990Store,
+      concordance: this.config.concordance,
+      thresholds: this.config.thresholds,
+      irsClient: this.config.irsClient,
+      ofacClient: this.config.ofacClient,
+      portfolioFitConfig: this.config.portfolioFit,
+      courtClient: this.config.courtClient,
+    });
 
     // 3. Persist result (non-blocking)
     if (response.success && response.data && vettingStore) {

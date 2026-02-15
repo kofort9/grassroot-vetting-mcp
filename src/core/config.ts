@@ -13,11 +13,6 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export interface ProPublicaConfig {
-  apiBaseUrl: string;
-  rateLimitMs: number;
-}
-
 export interface RedFlagConfig {
   courtlistenerApiToken?: string;
   courtlistenerBaseUrl: string;
@@ -27,17 +22,12 @@ export interface RedFlagConfig {
 }
 
 export interface AppConfig {
-  propublica: ProPublicaConfig;
   redFlag: RedFlagConfig;
   thresholds: VettingThresholds;
   portfolioFit: PortfolioFitConfig;
   discovery: DiscoveryIndexConfig;
   vettingCacheMaxAgeDays: number;
 }
-
-// Security: Only allow official ProPublica API endpoint
-const ALLOWED_API_BASE_URL =
-  "https://projects.propublica.org/nonprofits/api/v2";
 
 function envNum(
   key: string,
@@ -56,19 +46,6 @@ function envFloat(key: string, fallback: number): number {
 
 function envInt(key: string, fallback: number): number {
   return envNum(key, fallback, Number.isInteger);
-}
-
-/**
- * Loads ProPublica API configuration from environment variables
- * Note: ProPublica API is free and doesn't require authentication
- */
-export function loadProPublicaConfig(): ProPublicaConfig {
-  // Security: Ignore PROPUBLICA_API_BASE_URL env var to prevent SSRF
-  // Only the official ProPublica endpoint is allowed
-  return {
-    apiBaseUrl: ALLOWED_API_BASE_URL,
-    rateLimitMs: Math.max(100, envInt("PROPUBLICA_RATE_LIMIT_MS", 500)),
-  };
 }
 
 /**
@@ -360,7 +337,6 @@ export function loadConfig(): AppConfig {
   const thresholds = loadThresholds();
   validateThresholds(thresholds);
   return {
-    propublica: loadProPublicaConfig(),
     redFlag: loadRedFlagConfig(),
     thresholds,
     portfolioFit: loadPortfolioFitConfig(),
